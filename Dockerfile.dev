@@ -1,0 +1,22 @@
+ARG NODE_VERSION=24-bookworm-slim
+FROM node:${NODE_VERSION}
+
+WORKDIR /app
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends python3 make g++ \
+  && rm -rf /var/lib/apt/lists/*
+
+ENV NODE_ENV=development \
+    NEXT_TELEMETRY_DISABLED=1 \
+    HOSTNAME=0.0.0.0 \
+    PORT=3000 \
+    DATABASE_PATH=/app/data/fahrtenbuch.db \
+    BACKUP_DIR=/app/data/backups
+
+COPY docker-dev-entrypoint.sh /usr/local/bin/docker-dev-entrypoint.sh
+RUN chmod 755 /usr/local/bin/docker-dev-entrypoint.sh
+
+EXPOSE 3000
+ENTRYPOINT ["/usr/local/bin/docker-dev-entrypoint.sh"]
+CMD ["npm", "run", "dev", "--", "--hostname", "0.0.0.0"]

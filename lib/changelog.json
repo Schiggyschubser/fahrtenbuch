@@ -1,0 +1,182 @@
+[
+  {
+    "version": "1.0.10",
+    "date": "2026-09-01",
+    "title": "Theme-Auswahl mit modernen Fahrtenbuch-Designs erweitert",
+    "fileCount": 15,
+    "files": [
+      ".dockerignore",
+      "CUSTOM_CHANGES.md",
+      "README.md",
+      "VERSION",
+      "app/globals.css",
+      "components/AppFooter.tsx",
+      "components/SettingsClient.tsx",
+      "components/ThemeSelector.tsx",
+      "lib/changelog.json",
+      "lib/themes.ts",
+      "package-lock.json",
+      "package.json",
+      "scripts/version-check.mjs",
+      "scripts/version-commit.mjs",
+      "tests/e2e/fahrtenbuch.spec.ts"
+    ]
+  },
+  {
+    "version": "1.0.9",
+    "date": "2026-07-28",
+    "title": "Automatische, fortlaufende Projektversionierung ergänzt",
+    "fileCount": 14,
+    "files": [
+      ".env.example",
+      ".githooks/README.md",
+      ".githooks/post-commit",
+      "CONTRIBUTING.md",
+      "CUSTOM_CHANGES.md",
+      "Makefile",
+      "README.md",
+      "VERSION",
+      "docker-compose.yaml",
+      "package-lock.json",
+      "package.json",
+      "scripts/init-git.sh",
+      "scripts/version-check.mjs",
+      "scripts/version-commit.mjs"
+    ]
+  },
+  {
+    "version": "1.0.8",
+    "date": "2026-07-28",
+    "title": "Sechs moderne helle und dunkle Fahrtenbuch-Themes ergänzt",
+    "fileCount": 24,
+    "files": [
+      ".env.example",
+      "CUSTOM_CHANGES.md",
+      "README.md",
+      "VERSION",
+      "app/globals.css",
+      "app/layout.tsx",
+      "app/login/page.tsx",
+      "app/settings/page.tsx",
+      "components/AppFooter.tsx",
+      "components/AppHeader.tsx",
+      "components/DashboardClient.tsx",
+      "components/DashboardOverviewClient.tsx",
+      "components/DefaultCredentialsNotice.tsx",
+      "components/LoginForm.tsx",
+      "components/Modal.tsx",
+      "components/PrintToolbar.tsx",
+      "components/SettingsClient.tsx",
+      "components/ThemeSelector.tsx",
+      "components/TripModal.tsx",
+      "docker-compose.yaml",
+      "lib/changelog.json",
+      "lib/themes.ts",
+      "package-lock.json",
+      "package.json"
+    ]
+  },
+  {
+    "version": "1.0.7",
+    "date": "2026-07-28",
+    "title": "HTTP- und Reverse-Proxy-Anmeldung korrigiert",
+    "fileCount": 8,
+    "files": [
+      ".env.example",
+      "CUSTOM_CHANGES.md",
+      "Makefile",
+      "README.md",
+      "VERSION",
+      "lib/auth.ts",
+      "scripts/reset-admin.mjs",
+      "docker-compose.yaml"
+    ]
+  },
+  {
+    "version": "1.0.6",
+    "date": "2026-07-28",
+    "title": "Produktiven Standardport auf 1357 geändert",
+    "fileCount": 8,
+    "files": [
+      ".env.example",
+      "CUSTOM_CHANGES.md",
+      "README.md",
+      "VERSION",
+      "docker-compose.yaml",
+      "package.json",
+      "package-lock.json",
+      "scripts/install-local.sh"
+    ]
+  },
+  {
+    "version": "1.0.5",
+    "date": "2026-07-28",
+    "title": "Lokale Build- und Entwicklungsbasis ergänzt",
+    "fileCount": 12,
+    "files": [
+      ".env.example",
+      "CUSTOM_CHANGES.md",
+      "Dockerfile",
+      "Dockerfile.dev",
+      "Makefile",
+      "README.md",
+      "README-UPSTREAM.md",
+      "docker-compose.yaml",
+      "docker-compose.dev.yaml",
+      "docker-dev-entrypoint.sh",
+      "scripts/install-local.sh",
+      "scripts/backup-host.sh"
+    ]
+  },
+  {
+    "version": "1.0.4",
+    "date": "2026-07-28",
+    "title": "Statische Grafiken ins Docker-Image aufnehmen",
+    "fileCount": 1,
+    "files": [
+      "Dockerfile"
+    ],
+    "fingerprint": "51f3b739d315e55a"
+  },
+  {
+    "version": "1.0.3",
+    "date": "2026-07-28",
+    "title": "Docker-Installation in README vereinfachen",
+    "fileCount": 1,
+    "files": [
+      "README.md"
+    ],
+    "fingerprint": "568ce63ea8f58960"
+  },
+  {
+    "version": "1.0.2",
+    "date": "2026-07-28",
+    "title": "Browsertest an Versionsnummer koppeln",
+    "fileCount": 1,
+    "files": [
+      "tests/e2e/fahrtenbuch.spec.ts"
+    ],
+    "fingerprint": "aa35360e08d37681"
+  },
+  {
+    "version": "1.0.1",
+    "date": "2026-07-28",
+    "title": "Datenverzeichnis als Bind-Mount verwenden",
+    "fileCount": 5,
+    "files": [
+      ".gitattributes",
+      "Dockerfile",
+      "README.md",
+      "docker-compose.yaml",
+      "docker-entrypoint.sh"
+    ],
+    "fingerprint": "90b27e472f22ddf0"
+  },
+  {
+    "version": "1.0.0",
+    "date": "2026-07-28",
+    "title": "Öffentliche Version 1.0.0",
+    "fileCount": 0,
+    "files": []
+  }
+]

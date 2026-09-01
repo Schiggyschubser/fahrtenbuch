@@ -1,0 +1,55 @@
+name: Qualitätssicherung
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  secret-scan:
+    name: Secret-Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+      - name: Geheimnisse erkennen
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  application:
+    name: Anwendung prüfen
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_PATH: /tmp/fahrtenbuch-ci.db
+      BACKUP_DIR: /tmp/fahrtenbuch-backups
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Node.js einrichten
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+          cache: npm
+      - name: Abhängigkeiten installieren
+        run: npm ci
+      - name: Produktionsabhängigkeiten prüfen
+        run: npm audit --omit=dev --audit-level=high
+      - name: Code prüfen
+        run: npm run lint
+      - name: Typen prüfen
+        run: npx tsc --noEmit
+      - name: Tests ausführen
+        run: npm test
+      - name: Produktions-Build erstellen
+        run: npm run build
+      - name: Chromium installieren
+        run: npx playwright install --with-deps chromium
+      - name: Browsertests ausführen
+        run: npm run test:e2e
