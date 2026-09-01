@@ -1,6 +1,6 @@
 services:
   fahrtenbuch:
-    image: ghcr.io/celduinx/fahrtenbuch:latest
+    image: ghcr.io/schiggyschubser/fahrtenbuch:latest
     restart: unless-stopped
     init: true
     user: "0:0"

@@ -3,7 +3,7 @@
     "version": "1.0.10",
     "date": "2026-09-01",
     "title": "Theme-Auswahl mit modernen Fahrtenbuch-Designs erweitert",
-    "fileCount": 16,
+    "fileCount": 17,
     "files": [
       ".github/workflows/docker-publish.yml",
       ".dockerignore",
@@ -14,6 +14,7 @@
       "components/AppFooter.tsx",
       "components/SettingsClient.tsx",
       "components/ThemeSelector.tsx",
+      "docker-compose.yaml",
       "lib/changelog.json",
       "lib/themes.ts",
       "package-lock.json",

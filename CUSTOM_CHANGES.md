@@ -9,6 +9,7 @@ Ausgangsbasis ist das unveränderte Fahrtenbuch **1.0.4** unter MIT-Lizenz. Ab d
 - Fünf dunkle Themes: Night Drive, Asphalt, Control Room, Tunnel und Garage.
 - Seitenhintergrund zugunsten einer ruhigeren App-Optik geglättet.
 - Versionierungs-Skripte akzeptieren nun auch Compose-Dateien, die ein fertiges Image statt eines lokalen Build-Blocks verwenden.
+- Produktive Compose-Datei zeigt auf das eigene GHCR-Image `ghcr.io/schiggyschubser/fahrtenbuch:latest`.
 - Dev-Docker-Build korrigiert, indem der benötigte Entrypoint wieder im Build-Kontext bleibt.
 - GitHub-Docker-Workflow korrigiert, sodass GHCR-Image-Namen mit kleingeschriebenem Repository-Owner veröffentlicht werden.
 - Sichtbarer Footer-Hinweis auf `© Schudi, based on CelduinX` geändert.
