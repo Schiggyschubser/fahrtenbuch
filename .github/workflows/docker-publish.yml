@@ -31,6 +31,11 @@ jobs:
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "major_minor=${VERSION%.*}" >> "$GITHUB_OUTPUT"
 
+      - name: Image-Namen bestimmen
+        id: image
+        shell: bash
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/fahrtenbuch" >> "$GITHUB_OUTPUT"
+
       - name: QEMU einrichten
         uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4
 
@@ -48,7 +53,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
         with:
-          images: ghcr.io/${{ github.repository_owner }}/fahrtenbuch
+          images: ${{ steps.image.outputs.name }}
           tags: |
             type=raw,value=latest
             type=raw,value=${{ steps.version.outputs.version }}
@@ -78,6 +83,6 @@ jobs:
       - name: Build attestieren
         uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4
         with:
-          subject-name: ghcr.io/${{ github.repository_owner }}/fahrtenbuch
+          subject-name: ${{ steps.image.outputs.name }}
           subject-digest: ${{ steps.build.outputs.digest }}
           push-to-registry: true

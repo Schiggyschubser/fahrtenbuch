@@ -10,6 +10,7 @@ Ausgangsbasis ist das unveränderte Fahrtenbuch **1.0.4** unter MIT-Lizenz. Ab d
 - Seitenhintergrund zugunsten einer ruhigeren App-Optik geglättet.
 - Versionierungs-Skripte akzeptieren nun auch Compose-Dateien, die ein fertiges Image statt eines lokalen Build-Blocks verwenden.
 - Dev-Docker-Build korrigiert, indem der benötigte Entrypoint wieder im Build-Kontext bleibt.
+- GitHub-Docker-Workflow korrigiert, sodass GHCR-Image-Namen mit kleingeschriebenem Repository-Owner veröffentlicht werden.
 - Sichtbarer Footer-Hinweis auf `© Schudi, based on CelduinX` geändert.
 
 ## 1.0.9
