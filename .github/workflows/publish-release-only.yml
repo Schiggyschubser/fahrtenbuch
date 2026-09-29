@@ -1,0 +1,35 @@
+name: Bereits veröffentlichtes Release 1.0.12 eintragen
+
+on:
+  push:
+    branches: [publish-release-1.0.12]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-entry-1.0.12
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Veröffentlichten Anwendungsstand auschecken
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: 2ce8b994cdc6d8c9f1cf819da191e822dc8a1355
+      - name: Release für das bereits verfügbare Image erstellen
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_COMMIT: 2ce8b994cdc6d8c9f1cf819da191e822dc8a1355
+        shell: bash
+        run: |
+          test "$(node -p "require('./package.json').version")" = 1.0.12
+          test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
+          docker manifest inspect ghcr.io/schiggyschubser/fahrtenbuch:1.0.12 >/dev/null
+          if ! gh release view v1.0.12 >/dev/null 2>&1; then
+            gh release create v1.0.12 --target "$RELEASE_COMMIT" \
+              --title "Fahrtenbuch 1.0.12" --notes-file RELEASE_NOTES.md
+          fi
+          gh release view v1.0.12 --json url,tagName,isDraft,isPrerelease
