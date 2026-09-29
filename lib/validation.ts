@@ -1,5 +1,12 @@
 import { z } from "zod";
 
+export const vehicleSettingsSchema = z.object({
+  licensePlate: z.string().trim().min(1, "Bitte gib dein amtliches KFZ-Kennzeichen ein.")
+    .max(20, "Das Kennzeichen darf höchstens 20 Zeichen enthalten.")
+    .regex(/^[A-Za-zÄÖÜäöü0-9 -]+$/, "Bitte verwende nur Buchstaben, Zahlen, Leerzeichen und Bindestriche.")
+    .transform((value) => value.toLocaleUpperCase("de-DE").replace(/\s+/g, " ")),
+});
+
 const datePattern = /^\d{4}-(0[1-9]|1[0-2])-([0-2]\d|3[01])$/;
 const timePattern = /^([01]\d|2[0-3]):[0-5]\d$/;
 
@@ -59,6 +66,8 @@ export const restoreBackupSchema = z.object({
 });
 
 export const routePairSchema = z.object({
+  placeAFullName: z.string().trim().max(240).optional(),
+  placeBFullName: z.string().trim().max(240).optional(),
   placeA: z.string().trim().min(1, "Ort A fehlt.").max(120),
   placeB: z.string().trim().min(1, "Ort B fehlt.").max(120),
   distanceKm: z.number().int().positive("Die Entfernung muss größer als 0 sein.").max(100000),
@@ -69,7 +78,15 @@ export const routePairSchema = z.object({
   path: ["placeB"],
 });
 
+export const remarkTextSchema = z.string().trim().min(1, "Bitte einen Text eingeben.").max(2000);
+export const remarkSettingsSchema = z.object({
+  templates: z.array(z.object({ id: z.number().int().positive().optional(), text: remarkTextSchema })).max(200),
+  defaultTemplateIndex: z.number().int().nonnegative().nullable(),
+}).refine((value) => value.defaultTemplateIndex === null || value.defaultTemplateIndex < value.templates.length, "Ungültige Standardvorlage.");
+
 const tripBaseSchema = z.object({
+  accompanyingStaff: z.string().trim().max(2000).optional(),
+  remark: z.string().trim().max(2000).optional(),
   date: z.string().regex(datePattern, "Ungültiges Datum."),
   startTime: z.string().regex(timePattern, "Ungültige Beginnzeit."),
   endTime: z.string().regex(timePattern, "Ungültige Endzeit."),

@@ -47,7 +47,11 @@ export const twoFactorLoginChallenges = sqliteTable("two_factor_login_challenges
 ]);
 
 export const appSettings = sqliteTable("app_settings", {
+  licensePlate: text("license_plate").notNull().default(""),
+  printColumns: text("print_columns"),
+  tripColumns: text("trip_columns"),
   id: integer("id").primaryKey(),
+  defaultRemarkTemplateId: integer("default_remark_template_id"),
   reimbursementRateCents: integer("reimbursement_rate_cents").notNull().default(40),
   updatedAt: text("updated_at").notNull(),
 });
@@ -56,6 +60,8 @@ export const routePairs = sqliteTable("route_pairs", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   placeA: text("place_a").notNull(),
   placeB: text("place_b").notNull(),
+  placeAFullName: text("place_a_full_name").notNull().default(""),
+  placeBFullName: text("place_b_full_name").notNull().default(""),
   pairKey: text("pair_key").notNull(),
   distanceKm: integer("distance_km").notNull(),
   reimbursedKm: integer("reimbursed_km").notNull().default(0),
@@ -65,7 +71,16 @@ export const routePairs = sqliteTable("route_pairs", {
   updatedAt: text("updated_at").notNull(),
 }, (table) => [uniqueIndex("route_pairs_pair_key_unique").on(table.pairKey)]);
 
+export const remarkTemplates = sqliteTable("remark_templates", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  text: text("text").notNull(),
+});
+
 export const trips = sqliteTable("trips", {
+  accompanyingStaff: text("accompanying_staff").notNull().default(""),
+  remark: text("remark").notNull().default(""),
+  originFullNameSnapshot: text("origin_full_name_snapshot").notNull().default(""),
+  destinationFullNameSnapshot: text("destination_full_name_snapshot").notNull().default(""),
   id: integer("id").primaryKey({ autoIncrement: true }),
   date: text("date").notNull(),
   startTime: text("start_time").notNull(),

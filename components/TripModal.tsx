@@ -4,7 +4,8 @@ import { faChevronDown, faClock, faMagnifyingGlass } from "@fortawesome/free-sol
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
-import type { RouteOptionDto, TripDto } from "@/lib/types";
+import type { RemarkSettingsDto, RouteOptionDto, TripDto } from "@/lib/types";
+import { normalizeTimeInput } from "@/lib/time-input";
 import { Modal } from "./Modal";
 import { useAnimatedPresence } from "./useAnimatedPresence";
 
@@ -89,13 +90,11 @@ function TimeField({ id, label, value, alignRight = false, onChange }: {
           placeholder="HH:MM"
           maxLength={5}
           pattern="(?:[01][0-9]|2[0-3]):[0-5][0-9]"
-          title="Bitte eine Uhrzeit im Format HH:MM eingeben."
+          title="Uhrzeit als HH:MM oder vier Ziffern eingeben, zum Beispiel 0815 für 08:15."
           value={value}
           required
           autoComplete="off"
-          onFocus={() => setOpen(true)}
-          onClick={() => setOpen(true)}
-          onChange={(event) => { onChange(event.target.value.replace(/[^0-9:]/g, "").slice(0, 5)); setOpen(false); }}
+          onChange={(event) => { onChange(normalizeTimeInput(event.target.value)); setOpen(false); }}
           onKeyDown={(event) => {
             if (event.key === "Escape" && open) {
               event.preventDefault();
@@ -279,6 +278,32 @@ export function TripModal({ trip, defaultDate, suggestedOdometerStart, routeOpti
   const [odometerStart, setOdometerStart] = useState(String(trip?.odometerStart ?? suggestedOdometerStart ?? ""));
   const odometerTouchedRef = useRef(Boolean(trip));
   const [error, setError] = useState("");
+  const [accompanyingStaff, setAccompanyingStaff] = useState(trip?.accompanyingStaff ?? "");
+  const [remark, setRemark] = useState(trip?.remark ?? "");
+  const [remarkSettings, setRemarkSettings] = useState<RemarkSettingsDto | null>(null);
+  const [selectedRemarkId, setSelectedRemarkId] = useState("");
+  const remarkTouched = useRef(false);
+  useEffect(() => {
+    const controller = new AbortController();
+    async function loadRemarks() {
+      try {
+        const response = await fetch("/api/settings/remarks", { signal: controller.signal });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error ?? "Bemerkungsvorlagen konnten nicht geladen werden.");
+        if (controller.signal.aborted) return;
+        setRemarkSettings(result);
+        if (!trip && !remarkTouched.current) {
+          const template = (result as RemarkSettingsDto).templates.find((item) => item.id === result.defaultTemplateId);
+          setRemark(template?.text ?? "");
+          setSelectedRemarkId(template ? String(template.id) : "");
+        }
+      } catch (error) {
+        if (!controller.signal.aborted) setError(error instanceof Error ? error.message : "Bemerkungsvorlagen konnten nicht geladen werden.");
+      }
+    }
+    void loadRemarks();
+    return () => controller.abort();
+  }, [trip]);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [isPending, startTransition] = useTransition();
 
@@ -323,6 +348,8 @@ export function TripModal({ trip, defaultDate, suggestedOdometerStart, routeOpti
       return;
     }
     const payload: Record<string, unknown> = {
+      accompanyingStaff,
+      remark,
       date,
       startTime,
       endTime,
@@ -397,6 +424,29 @@ export function TripModal({ trip, defaultDate, suggestedOdometerStart, routeOpti
           </div>
 
           {error ? <p role="alert" className="status-enter rounded-xl border border-[var(--danger-line)] bg-[var(--danger-soft)] px-4 py-3 text-sm font-medium text-[var(--danger)]">{error}</p> : null}
+          <div>
+            <label className="label" htmlFor="trip-staff">Mitgenommene Bedienstete</label>
+            <textarea id="trip-staff" className="field" rows={2} maxLength={2000} value={accompanyingStaff} onChange={(event) => setAccompanyingStaff(event.target.value)} />
+          </div>
+          <div className="space-y-3">
+            <div>
+              <label className="label" htmlFor="trip-remark-template">Bemerkungsvorlage</label>
+              <select id="trip-remark-template" className="field" value={selectedRemarkId} disabled={!remarkSettings} onChange={(event) => {
+                const id = event.target.value;
+                setSelectedRemarkId(id);
+                remarkTouched.current = true;
+                setRemark(remarkSettings?.templates.find((template) => String(template.id) === id)?.text ?? "");
+              }}>
+                <option value="">{remarkSettings ? "Keine Vorlage / eigener Text" : "Vorlagen werden geladen …"}</option>
+                {remarkSettings?.templates.map((template) => <option key={template.id} value={template.id}>{template.text}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="label" htmlFor="trip-remark">Bemerkung</label>
+              <textarea id="trip-remark" className="field" rows={3} maxLength={2000} value={remark} onChange={(event) => { remarkTouched.current = true; setSelectedRemarkId(""); setRemark(event.target.value); }} />
+              <p className="mt-2 text-xs text-[var(--muted)]">Vorlagentexte kannst du frei bearbeiten oder ergänzen.</p>
+            </div>
+          </div>
           {confirmDelete ? (
             <div className="status-enter flex flex-col gap-3 rounded-xl border border-[var(--danger-line)] bg-[var(--danger-soft)] px-4 py-3 text-sm text-[var(--danger-strong)] sm:flex-row sm:items-center sm:justify-between">
               <span>Diese Fahrt wirklich dauerhaft löschen?</span>
@@ -412,7 +462,7 @@ export function TripModal({ trip, defaultDate, suggestedOdometerStart, routeOpti
           <div>{trip && !confirmDelete ? <button type="button" className="btn-danger focus-ring" onClick={() => setConfirmDelete(true)}>Fahrt löschen</button> : null}</div>
           <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
             <button type="button" className="btn-secondary focus-ring" onClick={requestClose}>Abbrechen</button>
-            <button type="submit" className="btn-primary focus-ring min-w-28" disabled={isPending}>{isPending ? "Speichern …" : "Speichern"}</button>
+            <button type="submit" className="btn-primary focus-ring min-w-28" disabled={isPending || !remarkSettings}>{isPending ? "Speichern …" : "Speichern"}</button>
           </div>
         </footer>
       </form>

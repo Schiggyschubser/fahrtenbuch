@@ -1,8 +1,23 @@
-export const TRIP_CSV_HEADERS = ["Datum", "Beginn", "Ende", "Reiseweg", "KM Beginn", "KM Ende"] as const;
+import { TRIP_COLUMNS } from "./trip-columns";
+
+export const LEGACY_TRIP_CSV_HEADERS = ["Datum", "Beginn", "Ende", "Reiseweg", "KM Beginn", "KM Ende"] as const;
+export const EXTENDED_TRIP_CSV_HEADERS = [...LEGACY_TRIP_CSV_HEADERS, "Ort Start ausgeschrieben", "Ort Ziel ausgeschrieben", "Mitgenommene Bedienstete", "Bemerkung"] as const;
+export const TRIP_CSV_HEADERS = [...TRIP_COLUMNS.map((column) => column.label), "Ort Start ausgeschrieben", "Ort Ziel ausgeschrieben", "Erstattungssatz Cent je KM"];
+
 export const MAX_TRIP_CSV_BYTES = 5 * 1024 * 1024;
 export const MAX_TRIP_CSV_ROWS = 10_000;
 
 export type TripCsvRow = {
+  sequenceNumber?: number;
+  distanceKm?: number;
+  reimbursedKm?: number;
+  unreimbursedKm?: number;
+  reimbursementRateCents?: number;
+  potentialReimbursementCents?: number;
+  originFullName?: string;
+  destinationFullName?: string;
+  accompanyingStaff?: string;
+  remark?: string;
   date: string;
   startTime: string;
   endTime: string;
@@ -84,7 +99,10 @@ export function parseTripCsv(text: string): TripCsvRow[] {
   if (text.includes("\uFFFD")) throw new Error("Die CSV-Datei ist nicht gültig UTF-8-codiert.");
   const rows = parseRows(text);
   const header = rows[0]?.values;
-  if (!header || JSON.stringify(header) !== JSON.stringify(TRIP_CSV_HEADERS)) {
+  const legacy = JSON.stringify(header) === JSON.stringify(LEGACY_TRIP_CSV_HEADERS);
+  const extended = JSON.stringify(header) === JSON.stringify(EXTENDED_TRIP_CSV_HEADERS);
+  const complete = JSON.stringify(header) === JSON.stringify(TRIP_CSV_HEADERS);
+  if (!header || (!legacy && !extended && !complete)) {
     throw new Error(`Die Kopfzeile muss exakt „${TRIP_CSV_HEADERS.join(";")}“ lauten.`);
   }
   const dataRows = rows.slice(1);
@@ -93,9 +111,11 @@ export function parseTripCsv(text: string): TripCsvRow[] {
     throw new Error(`Die CSV-Datei darf höchstens ${MAX_TRIP_CSV_ROWS.toLocaleString("de-DE")} Fahrten enthalten.`);
   }
 
-  return dataRows.map(({ values, line }) => {
-    if (values.length !== TRIP_CSV_HEADERS.length) {
-      throw new Error(`Zeile ${line}: Erwartet werden genau ${TRIP_CSV_HEADERS.length} Felder.`);
+  return dataRows.map(({ values: sourceValues, line }) => {
+    const expectedLength = header.length;
+    const values = complete ? [sourceValues[1], sourceValues[2], sourceValues[3], sourceValues[4], sourceValues[5], sourceValues[6], sourceValues[13], sourceValues[14], sourceValues[8], sourceValues[9]] : sourceValues;
+    if (sourceValues.length !== expectedLength) {
+      throw new Error(`Zeile ${line}: Erwartet werden genau ${expectedLength} Felder.`);
     }
     const [date, startTime, endTime, routeRaw, odometerStartRaw, odometerEndRaw] = values;
     const routeLabel = routeRaw.trim();
@@ -114,7 +134,32 @@ export function parseTripCsv(text: string): TripCsvRow[] {
     if (odometerEnd <= odometerStart) {
       throw new Error(`Zeile ${line}: KM Ende muss größer als KM Beginn sein.`);
     }
-    return { date, startTime, endTime, routeLabel, odometerStart, odometerEnd };
+    const extra = legacy ? {} : {
+      originFullName: values[6].trim(), destinationFullName: values[7].trim(),
+      accompanyingStaff: values[8].trim(), remark: values[9].trim(),
+    };
+    if ((extra.originFullName?.length ?? 0) > 240 || (extra.destinationFullName?.length ?? 0) > 240
+      || (extra.accompanyingStaff?.length ?? 0) > 2000 || (extra.remark?.length ?? 0) > 2000) {
+      throw new Error(`Zeile ${line}: Eine Zusatzangabe überschreitet die erlaubte Textlänge.`);
+    }
+    const billing: Partial<TripCsvRow> = {};
+    if (complete) {
+      // Imported sequence numbers are intentionally discarded.
+      const distanceKm = parseKilometers(sourceValues[7], line, "Gefahrene KM");
+      const reimbursedKm = parseKilometers(sourceValues[10], line, "KM abrechenbar");
+      const unreimbursedKm = parseKilometers(sourceValues[11], line, "KM nicht abrechenbar");
+      const reimbursementRateCents = parseKilometers(sourceValues[15], line, "Erstattungssatz Cent je KM");
+      const amount = sourceValues[12];
+      if (!/^\d+[,.]\d{2}$/.test(amount)) throw new Error(`Zeile ${line}: Erstattung muss ein Eurobetrag mit zwei Nachkommastellen sein.`);
+      const potentialReimbursementCents = Math.round(Number(amount.replace(",", ".")) * 100);
+      if (!Number.isSafeInteger(potentialReimbursementCents) || reimbursementRateCents > 10000
+        || distanceKm !== odometerEnd - odometerStart || reimbursedKm + unreimbursedKm !== distanceKm
+        || potentialReimbursementCents !== reimbursedKm * reimbursementRateCents) {
+        throw new Error(`Zeile ${line}: Abrechnungswerte und Erstattung sind nicht konsistent.`);
+      }
+      Object.assign(billing, { distanceKm, reimbursedKm, unreimbursedKm, reimbursementRateCents, potentialReimbursementCents });
+    }
+    return { date, startTime, endTime, routeLabel, odometerStart, odometerEnd, ...extra, ...billing };
   });
 }
 
@@ -126,19 +171,22 @@ function escapeCsvField(value: string | number) {
 export function serializeTripCsv(rows: TripCsvRow[]) {
   const lines = [
     TRIP_CSV_HEADERS.join(";"),
-    ...rows.map((row) => [
-      row.date,
-      row.startTime,
-      row.endTime,
-      row.routeLabel,
-      row.odometerStart,
-      row.odometerEnd,
-    ].map(escapeCsvField).join(";")),
+    ...rows.map((row) => {
+      const distance = row.odometerEnd - row.odometerStart;
+      const reimbursed = row.reimbursedKm ?? distance;
+      const rate = row.reimbursementRateCents ?? 40;
+      return [row.sequenceNumber ?? "", row.date, row.startTime, row.endTime, row.routeLabel,
+        row.odometerStart, row.odometerEnd, distance, row.accompanyingStaff ?? "", row.remark ?? "",
+        reimbursed, row.unreimbursedKm ?? distance - reimbursed,
+        ((row.potentialReimbursementCents ?? reimbursed * rate) / 100).toFixed(2).replace(".", ","),
+        row.originFullName ?? "", row.destinationFullName ?? "", rate,
+      ].map(escapeCsvField).join(";");
+    }),
   ];
   return `\uFEFF${lines.join("\r\n")}\r\n`;
 }
 
-export function tripCsvDuplicateKey(row: TripCsvRow) {
+export function tripCsvDuplicateKey(row: TripCsvRow, extended = false) {
   return JSON.stringify([
     row.date,
     row.startTime,
@@ -146,5 +194,6 @@ export function tripCsvDuplicateKey(row: TripCsvRow) {
     row.routeLabel,
     row.odometerStart,
     row.odometerEnd,
+    ...(extended ? [row.originFullName ?? "", row.destinationFullName ?? "", row.accompanyingStaff ?? "", row.remark ?? ""] : []),
   ]);
 }

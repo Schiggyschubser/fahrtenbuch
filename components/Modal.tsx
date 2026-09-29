@@ -2,8 +2,12 @@
 
 import { faXmark } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+
+const subscribeToClient = () => () => {};
+const getClientSnapshot = () => true;
+const getServerSnapshot = () => false;
 
 export function Modal({ title, description, size = "default", onClose, children }: {
   title: string;
@@ -13,6 +17,7 @@ export function Modal({ title, description, size = "default", onClose, children 
   children: ReactNode | ((requestClose: () => void) => ReactNode);
 }) {
   const [closing, setClosing] = useState(false);
+  const mounted = useSyncExternalStore(subscribeToClient, getClientSnapshot, getServerSnapshot);
   const requestClose = useCallback(() => {
     setClosing(true);
   }, []);
@@ -35,6 +40,8 @@ export function Modal({ title, description, size = "default", onClose, children 
       document.body.style.overflow = "";
     };
   }, [requestClose]);
+
+  if (!mounted) return null;
 
   return createPortal(
     <div data-state={closing ? "closed" : "open"} className="modal-backdrop fixed inset-0 z-50 flex items-end bg-[var(--backdrop)] p-0 backdrop-blur-[2px] sm:grid sm:place-items-center sm:p-6 lg:p-8" onMouseDown={(event) => event.target === event.currentTarget && requestClose()}>

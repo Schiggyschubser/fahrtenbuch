@@ -1,0 +1,40 @@
+import { expect, test } from "@playwright/test";
+import { ALL_TRIP_COLUMN_IDS } from "../../lib/trip-columns";
+
+test("Kennzeichen speichern und kompakte A4-Spalten", async ({ page }) => {
+  await page.goto("/login");
+  expect((await page.request.patch("/api/settings/vehicle", { data: { licensePlate: "CO-AB 123" } })).status()).toBe(401);
+  await page.getByLabel("Benutzername").fill("admin");
+  await page.getByLabel("Passwort", { exact: true }).fill("admin");
+  await page.getByRole("button", { name: "Anmelden" }).click();
+  await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
+  expect((await page.request.patch("/api/settings/vehicle", { data: { licensePlate: " " } })).status()).toBe(400);
+  await page.goto("/settings?tab=routes");
+  await page.getByLabel("Amtliches KFZ-Kennzeichen").fill("co-ab 123");
+  await page.getByRole("button", { name: "Kennzeichen speichern" }).click();
+  await expect(page.getByRole("status")).toHaveText("Das Kennzeichen wurde gespeichert.");
+  await page.reload();
+  await expect(page.getByLabel("Amtliches KFZ-Kennzeichen")).toHaveValue("CO-AB 123");
+  await page.request.patch("/api/settings/print-columns", { data: { visibleColumns: ALL_TRIP_COLUMN_IDS } });
+  await page.goto("/print?month=2040-01");
+  await expect(page.locator(".print-pages")).toHaveAttribute("data-ready", "true");
+  await expect(page.locator(".print-pages header").first()).toContainText("KFZ-Kennzeichen: CO-AB 123");
+  const date = page.locator('.print-pages th[data-column="date"]').first();
+  expect((await date.boundingBox())!.width).toBeCloseTo(64, 0);
+  expect(await page.locator(".print-pages thead th").evaluateAll(elements => elements.filter(element => element.scrollWidth > element.clientWidth + 1).map(element => element.textContent))).toEqual([]);
+  await page.emulateMedia({ media: "print" });
+  await expect(page.locator(".print-pages header").first()).toContainText("KFZ-Kennzeichen: CO-AB 123");
+  expect((await date.boundingBox())!.width).toBeCloseTo(64, 0);
+  await page.emulateMedia({ media: "screen" });
+  await page.evaluate(() => localStorage.setItem("fahrtenbuch-theme", "night-drive"));
+  await page.reload();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "night-drive");
+  await expect(page.locator(".print-pages")).toHaveAttribute("data-ready", "true");
+  await expect(page.locator(".print-pages .print-sheet").first()).toHaveCSS("background-color", "rgb(255, 255, 255)");
+  await expect(page.locator(".print-pages thead tr").first()).toHaveCSS("background-color", "rgb(248, 250, 252)");
+  await page.goto("/trips?month=2040-01");
+  await page.screenshot({ path: "test-results/night-drive.png", fullPage: true });
+  await page.goto("/settings?tab=appearance");
+  await expect(page.getByRole("button", { name: /Night Drive/ })).toHaveAttribute("aria-pressed", "true");
+
+});

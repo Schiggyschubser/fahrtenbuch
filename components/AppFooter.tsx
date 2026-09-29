@@ -24,8 +24,8 @@ export function AppFooter({ version, changelog }: { version: string; changelog: 
 
   return (
     <>
-      <footer className="app-footer mt-auto w-full bg-transparent px-4 py-5 text-xs text-[var(--muted)] sm:px-6">
-        <div className="mx-auto flex w-full max-w-[1380px] items-center justify-between gap-4">
+      <footer className="app-footer mt-auto w-full bg-transparent py-3 text-xs text-[var(--muted)]">
+        <div className="app-frame flex items-center justify-between gap-4">
           <span>© Schudi, based on CelduinX</span>
           <button type="button" className="focus-ring inline-flex items-center gap-2 rounded-lg px-2 py-1 font-bold text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--primary)]" onClick={() => setChangelogOpen(true)} aria-label={`Version ${version} – Changelog öffnen`}>
             <FontAwesomeIcon icon={faCodeBranch} className="h-3.5 w-3.5" />

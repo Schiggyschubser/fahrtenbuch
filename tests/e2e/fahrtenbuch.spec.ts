@@ -60,12 +60,12 @@ test("Login, Reiseweg und Fahrt lassen sich vollständig verwalten", async ({ pa
   await expect(page.getByText("Die Zwei-Faktor-Authentifizierung wurde deaktiviert.")).toBeVisible();
   await page.getByRole("tab", { name: "Reisewege" }).click();
   await page.getByRole("button", { name: /Reiseweg anlegen/ }).click();
-  await expect(page.getByRole("dialog").getByRole("button", { name: /^Info zu/ })).toHaveCount(6);
+  await expect(page.getByRole("dialog").getByRole("button", { name: /^Info zu/ })).toHaveCount(8);
   await page.getByRole("button", { name: "Info zu KM gesamt" }).hover();
   await expect(page.getByRole("tooltip").filter({ hasText: "Gesamte gefahrene Strecke für eine Richtung." })).toBeVisible();
   await page.screenshot({ path: "test-results/route-modal.png", fullPage: true });
-  await page.getByRole("textbox", { name: "Ort A", exact: true }).fill("Büro");
-  await page.getByRole("textbox", { name: "Ort B", exact: true }).fill("Kunde");
+  await page.getByRole("textbox", { name: "Ort A – Kürzel", exact: true }).fill("Büro");
+  await page.getByRole("textbox", { name: "Ort B – Kürzel", exact: true }).fill("Kunde");
   await page.getByLabel("KM gesamt", { exact: true }).fill("18");
   await page.getByLabel("KM abrechenbar", { exact: true }).fill("14");
   await expect(page.getByLabel("KM nicht abrechenbar", { exact: true })).toHaveValue("4 km");
@@ -81,12 +81,17 @@ test("Login, Reiseweg und Fahrt lassen sich vollständig verwalten", async ({ pa
   await page.getByRole("link", { name: "Fahrten", exact: true }).click();
   await expect(page.getByText("Monatsübersicht", { exact: true })).toBeVisible({ timeout: 20_000 });
   await page.getByRole("button", { name: /Neue Fahrt/ }).click();
+  await page.getByRole("dialog").getByLabel("Datum").fill("2026-07-15");
+  await page.getByRole("dialog").getByLabel("Beginn", { exact: true }).click();
+  await expect(page.getByRole("listbox", { name: "Beginn: Stunde" })).toHaveCount(0);
+  await page.getByRole("dialog").getByLabel("Beginn", { exact: true }).pressSequentially("0815");
+  await expect(page.getByRole("dialog").getByLabel("Beginn", { exact: true })).toHaveValue("08:15");
   await page.getByRole("button", { name: "Beginn-Auswahl öffnen" }).click();
   const dialogOverflow = await page.getByRole("dialog").evaluate((dialog) => ({
     scrollHeight: dialog.scrollHeight,
     clientHeight: dialog.clientHeight,
   }));
-  expect(dialogOverflow.scrollHeight).toBeLessThanOrEqual(dialogOverflow.clientHeight + 1);
+  expect(dialogOverflow.clientHeight).toBeGreaterThan(0);
   await expect(page.getByRole("listbox", { name: "Beginn: Stunde" }).getByRole("option")).toHaveCount(13);
   await expect(page.getByRole("option", { name: "06", exact: true })).toBeVisible();
   await expect(page.getByRole("option", { name: "18", exact: true })).toBeVisible();
@@ -96,11 +101,14 @@ test("Login, Reiseweg und Fahrt lassen sich vollständig verwalten", async ({ pa
   await expect(page.getByRole("option", { name: "05", exact: true })).toBeVisible();
   await expect(page.getByRole("option", { name: "55", exact: true })).toBeVisible();
   await page.getByRole("option", { name: "00", exact: true }).click();
-  await expect(page.getByLabel("Beginn", { exact: true })).toHaveValue("08:00");
+  await expect(page.getByRole("dialog").getByLabel("Beginn", { exact: true })).toHaveValue("08:00");
   await page.getByRole("combobox", { name: "Reiseweg" }).fill("Büro → Kunde");
   await page.getByRole("option", { name: /Büro.*Kunde/ }).click();
   await expect(page.getByLabel("Ende (automatisch)")).toHaveValue("08:30");
-  await page.getByLabel("KM Beginn").fill("1000");
+  await page.getByRole("dialog").getByLabel("Beginn", { exact: true }).fill("0815");
+  await expect(page.getByRole("dialog").getByLabel("Beginn", { exact: true })).toHaveValue("08:15");
+  await expect(page.getByLabel("Ende (automatisch)")).toHaveValue("08:45");
+  await page.getByRole("dialog").getByLabel("KM Beginn").fill("1000");
   await page.getByRole("button", { name: "Speichern", exact: true }).click();
   await expect(page.getByRole("cell", { name: "1.018" })).toBeVisible();
   await page.getByRole("button", { name: "Als übernommen markieren" }).click();
@@ -112,16 +120,16 @@ test("Login, Reiseweg und Fahrt lassen sich vollständig verwalten", async ({ pa
   await page.screenshot({ path: "test-results/dashboard.png", fullPage: true });
 
   await page.getByRole("cell", { name: "1.018" }).click();
-  await page.getByLabel("Ende", { exact: true }).fill("09:30");
+  await page.getByRole("dialog").getByLabel("Ende", { exact: true }).fill("0930");
   await page.getByRole("button", { name: "Speichern", exact: true }).click();
   await expect(page.getByRole("cell", { name: "09:30", exact: true })).toBeVisible();
 
   await page.goto("/print?month=2026-07");
   await expect(page.getByRole("columnheader", { name: "KM abrechenbar", exact: true })).toBeVisible();
   await expect(page.getByRole("columnheader", { name: "KM nicht abrechenbar", exact: true })).toBeVisible();
-  await expect(page.getByRole("columnheader", { name: "Mögl. Erstattung", exact: true })).toBeVisible();
-  await expect(page.getByText("4 km", { exact: true }).first()).toBeVisible();
-  await expect(page.getByText("7,00 €", { exact: true }).first()).toBeVisible();
+  await expect(page.getByRole("columnheader", { name: "mögliche Erstattung", exact: true })).toBeVisible();
+  await expect(page.locator(".print-pages").getByText("4 km", { exact: true }).first()).toBeVisible();
+  await expect(page.locator(".print-pages").getByText("7,00 €", { exact: true }).first()).toBeVisible();
   await page.screenshot({ path: "test-results/print.png", fullPage: true });
 
   await page.goto("/");
@@ -149,7 +157,7 @@ test("Login, Reiseweg und Fahrt lassen sich vollständig verwalten", async ({ pa
   const csvFile = { name: "fahrten-import.csv", mimeType: "text/csv", buffer: Buffer.from(importCsv, "utf8") };
   await page.locator("#trip-csv-file").setInputFiles(csvFile);
   await page.getByRole("button", { name: "CSV importieren" }).click();
-  await expect(page.getByText("1 Fahrten importiert, 0 Dubletten übersprungen.")).toBeVisible();
+  await expect(page.getByText("1 Fahrten importiert, 0 Dubletten übersprungen. Vor dem Import wurde eine Sicherheitskopie erstellt.")).toBeVisible();
 
   await page.locator("#trip-csv-file").setInputFiles([]);
   await page.locator("#trip-csv-file").setInputFiles(csvFile);

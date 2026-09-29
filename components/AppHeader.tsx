@@ -22,7 +22,7 @@ export function AppHeader() {
 
   return (
     <header className="page-enter sticky top-0 z-40 border-b border-[var(--line)] bg-[var(--surface-translucent)] backdrop-blur lg:static">
-      <div className="mx-auto flex h-16 w-full max-w-[1380px] items-center justify-between px-4 sm:px-6 lg:h-[74px] lg:px-8">
+      <div data-testid="desktop-app-bar" className="app-frame flex h-16 items-center justify-between lg:h-[74px]">
         <Link href="/" className="focus-ring flex items-center gap-3 rounded-xl">
           <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[var(--logo-surface)] p-1 shadow-sm ring-1 ring-[var(--line)]">
             <Image src="/brand/logo.png" alt="" width={40} height={40} className="h-full w-full object-contain" priority />

@@ -17,7 +17,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   return (
     <>
       <AppHeader />
-      <main className="page-enter mx-auto w-full max-w-[1380px] px-4 py-5 sm:px-6 lg:px-8 lg:py-8">
+      <main className="app-frame app-content page-enter py-5 lg:py-6">
         {user.usesDefaultCredentials ? <DefaultCredentialsNotice /> : null}
         <DashboardOverviewClient initialData={data} />
         {params.addTrip === "1" ? <DashboardQuickAdd routeOptions={toRouteOptions(pairs)} suggestedOdometerStart={suggestedOdometerStart} defaultDate={today} /> : null}

@@ -77,8 +77,9 @@ describe("Fahrten-CSV", () => {
     }];
     const csv = serializeTripCsv(rows);
 
-    expect(csv.startsWith("\uFEFFDatum;Beginn;Ende;Reiseweg;KM Beginn;KM Ende\r\n")).toBe(true);
-    expect(parseTripCsv(csv)).toEqual(rows);
+    expect(csv.startsWith("\uFEFFlfd. Nr.;Datum;Beginn;Ende;Reiseweg;")).toBe(true);
+    expect(parseTripCsv(csv)).toEqual(rows.map((row) => ({ ...row, originFullName: "", destinationFullName: "", accompanyingStaff: "", remark: "", distanceKm: 18, reimbursedKm: 18, unreimbursedKm: 0, reimbursementRateCents: 40, potentialReimbursementCents: 720 })));
+
   });
 
   it("meldet die logische Zeile bei ungültigen Importwerten", () => {
@@ -114,14 +115,21 @@ describe("Reisewege", () => {
     expect(pairKey(" Berlin ", "Hamburg")).toBe(pairKey("hamburg", "berlin"));
   });
 
+  it("validiert optionale ausgeschriebene Ortsnamen", () => {
+    const input = { placeA: "HH", placeB: "B", distanceKm: 10, reimbursedKm: 10, durationMinutes: 20 };
+    expect(routePairSchema.safeParse(input).success).toBe(true);
+    expect(routePairSchema.parse({ ...input, placeAFullName: " Hamburg " }).placeAFullName).toBe("Hamburg");
+    expect(routePairSchema.safeParse({ ...input, placeBFullName: "x".repeat(241) }).success).toBe(false);
+  });
+
   it("erzeugt beide auswählbaren Richtungen", () => {
-    const options = toRouteOptions([{ id: 1, placeA: "Berlin", placeB: "Potsdam", distanceKm: 35, reimbursedKm: 30, unreimbursedKm: 5, durationMinutes: 40 }]);
+    const options = toRouteOptions([{ id: 1, placeAFullName: "", placeBFullName: "", placeA: "Berlin", placeB: "Potsdam", distanceKm: 35, reimbursedKm: 30, unreimbursedKm: 5, durationMinutes: 40 }]);
     expect(options).toHaveLength(2);
     expect(options.map((option) => option.label)).toEqual(["Berlin → Potsdam", "Potsdam → Berlin"]);
   });
 
   it("weist identische Start- und Zielorte zurück", () => {
-    expect(routePairSchema.safeParse({ placeA: "Berlin", placeB: "berlin", distanceKm: 10, reimbursedKm: 8, durationMinutes: 20 }).success).toBe(false);
+    expect(routePairSchema.safeParse({ placeAFullName: "", placeBFullName: "", placeA: "Berlin", placeB: "berlin", distanceKm: 10, reimbursedKm: 8, durationMinutes: 20 }).success).toBe(false);
   });
 
   it("begrenzt nicht abgerechnete Kilometer auf null", () => {

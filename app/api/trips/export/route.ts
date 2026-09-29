@@ -21,14 +21,7 @@ export async function GET(request: Request) {
     if (trips.length === 0) {
       throw new Error("Im gewählten Zeitraum sind keine Fahrten vorhanden.");
     }
-    const csv = serializeTripCsv(trips.map((trip) => ({
-      date: trip.date,
-      startTime: trip.startTime,
-      endTime: trip.endTime,
-      routeLabel: trip.routeLabel,
-      odometerStart: trip.odometerStart,
-      odometerEnd: trip.odometerEnd,
-    })));
+    const csv = serializeTripCsv(trips);
     const filename = exportAll ? "fahrtenbuch-gesamt.csv" : `fahrtenbuch-${range.from}-bis-${range.to}.csv`;
     return new Response(csv, {
       headers: {

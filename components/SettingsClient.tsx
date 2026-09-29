@@ -1,4 +1,5 @@
 "use client";
+import { TRIP_CSV_HEADERS } from "@/lib/trip-csv";
 
 import {
   faArrowsLeftRight,
@@ -32,9 +33,15 @@ import { THEMES } from "@/lib/themes";
 import { Modal } from "./Modal";
 import { ThemeSelector } from "./ThemeSelector";
 
-export type SettingsTab = "appearance" | "routes" | "reimbursement" | "backups" | "transfer" | "credentials";
+import { RemarkSettingsCard } from "./RemarkSettingsCard";
+import { VehicleSettingsCard } from "./VehicleSettingsCard";
+import type { RemarkSettingsDto } from "@/lib/types";
 
-export function SettingsClient({ initialRoutes, initialBackups, initialReimbursementSettings, initialTwoFactorStatus, initialTripDateRange, initialTab, username }: {
+export type SettingsTab = "appearance" | "remarks" | "routes" | "reimbursement" | "backups" | "transfer" | "credentials";
+
+export function SettingsClient({ initialVehicleSettings, initialRemarkSettings, initialRoutes, initialBackups, initialReimbursementSettings, initialTwoFactorStatus, initialTripDateRange, initialTab, username }: {
+  initialVehicleSettings: { licensePlate: string };
+  initialRemarkSettings: RemarkSettingsDto;
   initialRoutes: RoutePairDto[];
   initialBackups: BackupDto[];
   initialReimbursementSettings: ReimbursementSettingsDto;
@@ -43,6 +50,8 @@ export function SettingsClient({ initialRoutes, initialBackups, initialReimburse
   initialTab: SettingsTab;
   username: string;
 }) {
+  const [remarkSettings, setRemarkSettings] = useState(initialRemarkSettings);
+  const [vehicleSettings, setVehicleSettings] = useState(initialVehicleSettings);
   const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab);
   const [routes, setRoutes] = useState(initialRoutes);
   const [backups, setBackups] = useState(initialBackups);
@@ -61,16 +70,21 @@ export function SettingsClient({ initialRoutes, initialBackups, initialReimburse
   }
 
   async function reloadAllData() {
-    const [routesResponse, backupsResponse, reimbursementResponse] = await Promise.all([
+    const vehicleResponse = await fetch("/api/settings/vehicle");
+    if (vehicleResponse.ok) setVehicleSettings(await vehicleResponse.json());
+    const [routesResponse, backupsResponse, reimbursementResponse, remarksResponse] = await Promise.all([
       fetch("/api/routes"),
       fetch("/api/backups"),
       fetch("/api/settings/reimbursement"),
+      fetch("/api/settings/remarks"),
     ]);
-    const [routesResult, backupsResult, reimbursementResult] = await Promise.all([
+    const [routesResult, backupsResult, reimbursementResult, remarksResult] = await Promise.all([
       routesResponse.json(),
       backupsResponse.json(),
       reimbursementResponse.json(),
+      remarksResponse.json(),
     ]);
+    if (remarksResponse.ok) setRemarkSettings(remarksResult);
     if (routesResponse.ok) setRoutes(routesResult.routes);
     if (backupsResponse.ok) setBackups(backupsResult.backups);
     if (reimbursementResponse.ok) setReimbursementSettings(reimbursementResult);
@@ -78,8 +92,9 @@ export function SettingsClient({ initialRoutes, initialBackups, initialReimburse
 
   return (
     <div>
-      <div role="tablist" aria-label="Einstellungsbereiche" className="section-enter mb-5 flex gap-2 overflow-x-auto rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-2 shadow-[var(--card-shadow)] md:mb-6 md:grid md:grid-cols-3 md:overflow-visible xl:grid-cols-6">
+      <div role="tablist" aria-label="Einstellungsbereiche" className="section-enter mb-5 flex gap-2 overflow-x-auto rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-2 shadow-[var(--card-shadow)] md:mb-6 md:grid md:grid-cols-3 md:overflow-visible xl:grid-cols-7">
         <SettingsTabButton active={activeTab === "appearance"} icon="appearance" title="Darstellung" description={`${THEMES.length} helle und dunkle Themes`} onClick={() => selectTab("appearance")} />
+        <SettingsTabButton active={activeTab === "remarks"} icon="remarks" title="Bemerkungen" description="Vorlagen und Standardtext" onClick={() => selectTab("remarks")} />
         <SettingsTabButton active={activeTab === "routes"} icon="routes" title="Reisewege" description={`${routes.length} gespeicherte Strecken`} onClick={() => selectTab("routes")} />
         <SettingsTabButton active={activeTab === "reimbursement"} icon="reimbursement" title="Abrechnung" description={`${(reimbursementSettings.reimbursementRateCents / 100).toLocaleString("de-DE", { minimumFractionDigits: 2 })} € pro km`} onClick={() => selectTab("reimbursement")} />
         <SettingsTabButton active={activeTab === "backups"} icon="backups" title="Sicherungen" description={`${backups.length} Backups vorhanden`} onClick={() => selectTab("backups")} />
@@ -89,8 +104,10 @@ export function SettingsClient({ initialRoutes, initialBackups, initialReimburse
 
       <div key={activeTab} role="tabpanel" className="section-enter">
         {activeTab === "appearance" ? <ThemeSelector /> : null}
+        {activeTab === "remarks" ? <RemarkSettingsCard settings={remarkSettings} onSaved={setRemarkSettings} /> : null}
         {activeTab === "routes" ? (
-          <RoutesCard routes={routes} onCreate={() => setRouteModal({ key: `new-${Date.now()}` })} onEdit={(route) => setRouteModal({ key: `edit-${route.id}`, route })} />
+          <><VehicleSettingsCard settings={vehicleSettings} onSaved={setVehicleSettings} />
+          <RoutesCard routes={routes} onCreate={() => setRouteModal({ key: `new-${Date.now()}` })} onEdit={(route) => setRouteModal({ key: `edit-${route.id}`, route })} /></>
         ) : null}
         {activeTab === "reimbursement" ? (
           <ReimbursementCard settings={reimbursementSettings} onSaved={setReimbursementSettings} />
@@ -107,6 +124,7 @@ export function SettingsClient({ initialRoutes, initialBackups, initialReimburse
 
 function SettingsTabIcon({ type }: { type: SettingsTab }) {
   const icons: Record<SettingsTab, IconDefinition> = {
+    remarks: faClipboard,
     appearance: faPalette,
     routes: faRoute,
     reimbursement: faEuroSign,
@@ -324,7 +342,7 @@ function TransferCard({ initialDateRange, onImported }: {
             <div><label className="label" htmlFor="export-from">Von einschließlich</label><input className="field" id="export-from" type="date" value={from} onChange={(event) => setFrom(event.target.value)} required /></div>
             <div><label className="label" htmlFor="export-to">Bis einschließlich</label><input className="field" id="export-to" type="date" value={to} min={from} onChange={(event) => setTo(event.target.value)} required /></div>
           </div>
-          <div className="rounded-xl bg-[var(--surface-muted)] px-4 py-3 text-sm leading-6 text-[var(--text-secondary)]">Exportiert werden <strong>Datum, Beginn, Ende, Reiseweg, KM Beginn und KM Ende</strong>. Die Datei kann später unverändert wieder importiert werden.</div>
+          <div className="rounded-xl bg-[var(--surface-muted)] px-4 py-3 text-sm leading-6 text-[var(--text-secondary)]">Exportiert werden <strong>alle Fahrtangaben einschließlich Kilometer, Erstattung, ausgeschriebener Orte, Bediensteter und Bemerkungen</strong>. Die Datei kann später unverändert wieder importiert werden.</div>
           {exportError ? <p role="alert" className="status-enter rounded-xl border border-[var(--danger-line)] bg-[var(--danger-soft)] px-4 py-3 text-sm text-[var(--danger)]">{exportError}</p> : null}
           <div className="flex flex-col gap-2 sm:flex-row">
             <button type="submit" className="btn-primary focus-ring w-full sm:w-auto" disabled={isExportPending || !from || !to || to < from}><FontAwesomeIcon icon={faFileArrowDown} className="h-4 w-4" /> {isExportPending ? "Export wird erstellt …" : "CSV exportieren"}</button>
@@ -340,9 +358,9 @@ function TransferCard({ initialDateRange, onImported }: {
         </header>
         <form onSubmit={importTrips} className="space-y-5 px-5 py-5 sm:px-6 sm:py-6">
           <div className="rounded-xl border border-[var(--primary-muted)] bg-[var(--primary-soft)] px-4 py-3 text-sm leading-6 text-[var(--primary)]">
-            <strong>Erwartete Kopfzeile:</strong>
-            <code className="mt-2 block overflow-x-auto whitespace-nowrap rounded-lg bg-[var(--surface-overlay)] px-3 py-2 text-xs">Datum;Beginn;Ende;Reiseweg;KM Beginn;KM Ende</code>
-            <strong className="mt-3 block">Beispielzeile:</strong>
+            <strong>Vollständige Kopfzeile:</strong><p>Der Export enthält alle Daten unabhängig von der Spaltenauswahl. Erstattung in Euro, Erstattungssatz in Cent je Kilometer. Bisherige Dateien mit 6 oder 10 Spalten bleiben importierbar.</p>
+            <code className="mt-2 block overflow-x-auto whitespace-nowrap rounded-lg bg-[var(--surface-overlay)] px-3 py-2 text-xs">{TRIP_CSV_HEADERS.join(";")}</code>
+            <strong className="mt-3 block">Beispiel für das bisherige Format mit 6 Spalten:</strong>
             <code className="mt-2 block overflow-x-auto whitespace-nowrap rounded-lg bg-[var(--surface-overlay)] px-3 py-2 text-xs">2026-07-28;08:00;09:30;Büro → Kunde;1000;1018</code>
           </div>
           <div>
@@ -676,7 +694,7 @@ function RouteModal({ route, onClose, onSaved }: { route?: RoutePairDto; onClose
   function submit(formData: FormData) {
     setError("");
     startTransition(async () => {
-      const response = await fetch(route ? `/api/routes/${route.id}` : "/api/routes", { method: route ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ placeA: formData.get("placeA"), placeB: formData.get("placeB"), distanceKm: Number(formData.get("distanceKm")), reimbursedKm: Number(formData.get("reimbursedKm")), durationMinutes: Number(formData.get("durationMinutes")) }) });
+      const response = await fetch(route ? `/api/routes/${route.id}` : "/api/routes", { method: route ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ placeA: formData.get("placeA"), placeB: formData.get("placeB"), placeAFullName: formData.get("placeAFullName"), placeBFullName: formData.get("placeBFullName"), distanceKm: Number(formData.get("distanceKm")), reimbursedKm: Number(formData.get("reimbursedKm")), durationMinutes: Number(formData.get("durationMinutes")) }) });
       const result = await response.json();
       if (!response.ok) { setError(result.error ?? "Der Reiseweg konnte nicht gespeichert werden."); return; }
       onSaved();
@@ -699,9 +717,15 @@ function RouteModal({ route, onClose, onSaved }: { route?: RoutePairDto; onClose
       <form action={submit}>
         <div className="space-y-5 px-5 py-5 sm:px-7 sm:py-6">
           <div className="grid grid-cols-1 items-end gap-3 sm:grid-cols-[1fr_auto_1fr]">
-            <RouteField id="route-place-a" name="placeA" label="Ort A" icon={faLocationDot} help="Start- oder Zielort des Reisewegs." defaultValue={route?.placeA} maxLength={120} required autoFocus />
+            <div className="space-y-3">
+            <RouteField id="route-place-a" name="placeA" label="Ort A – Kürzel" icon={faLocationDot} help="Start- oder Zielort des Reisewegs." defaultValue={route?.placeA} maxLength={120} required autoFocus />
+              <RouteField id="route-place-a-full" name="placeAFullName" label="Ort A – ausgeschrieben" icon={faLocationDot} help="Optional. Wird auch bei bestehenden Fahrten, im Druck und PDF angezeigt." defaultValue={route?.placeAFullName} maxLength={240} />
+            </div>
             <span className="hidden pb-3 text-[var(--muted)] sm:block"><FontAwesomeIcon icon={faArrowsLeftRight} className="h-4 w-4" /></span>
-            <RouteField id="route-place-b" name="placeB" label="Ort B" icon={faLocationDot} help="Der zweite Ort des Reisewegs." defaultValue={route?.placeB} maxLength={120} required />
+            <div className="space-y-3">
+            <RouteField id="route-place-b" name="placeB" label="Ort B – Kürzel" icon={faLocationDot} help="Der zweite Ort des Reisewegs." defaultValue={route?.placeB} maxLength={120} required />
+              <RouteField id="route-place-b-full" name="placeBFullName" label="Ort B – ausgeschrieben" icon={faLocationDot} help="Optional. Wird auch bei bestehenden Fahrten, im Druck und PDF angezeigt." defaultValue={route?.placeBFullName} maxLength={240} />
+            </div>
           </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <RouteField id="route-distance" name="distanceKm" label="KM gesamt" icon={faRoad} help="Gesamte gefahrene Strecke für eine Richtung." type="number" min="1" step="1" value={distanceKm} onChange={(event) => setDistanceKm(event.target.value)} required />

@@ -37,8 +37,8 @@ function Delta({ value }: { value: number | null }) {
 
 function KpiCard({ label, value, hint, icon }: { label: string; value: string; hint: string; icon: React.ReactNode }) {
   return (
-    <div className="soft-card rounded-[18px] border border-[var(--line)] bg-[var(--surface)] p-4 shadow-[0_6px_22px_rgba(15,23,42,.045)] sm:p-5">
-      <div className="mb-5 flex items-start justify-between gap-3">
+    <div className="soft-card rounded-[18px] border border-[var(--line)] bg-[var(--surface)] px-4 py-3 shadow-[0_6px_22px_rgba(15,23,42,.045)] sm:px-5 sm:py-3">
+      <div className="mb-2 flex items-start justify-between gap-3">
         <p className="text-[11px] font-extrabold uppercase tracking-[.1em] text-[var(--muted)]">{label}</p>
         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[var(--primary-soft)] text-[var(--primary)]">{icon}</span>
       </div>
@@ -52,7 +52,7 @@ function TrendChart({ data }: { data: DashboardDataDto }) {
   const maxKm = Math.max(...data.trend.map((item) => item.totalKm), 1);
   return (
     <section className="section-enter soft-card min-w-0 overflow-hidden rounded-[20px] border border-[var(--line)] bg-[var(--surface)] p-5 shadow-[0_8px_28px_rgba(15,23,42,.05)] sm:p-6 lg:col-span-2">
-      <div className="mb-6 flex items-start justify-between gap-4">
+      <div className="mb-4 flex items-start justify-between gap-4">
         <div>
           <p className="text-[11px] font-extrabold uppercase tracking-[.1em] text-[var(--muted)]">Verlauf</p>
           <h2 className="mt-1 text-xl font-extrabold tracking-[-.025em]">{data.selectedPeriod === "all" ? "Kilometer nach Jahren" : "Kilometer nach Monaten"}</h2>
@@ -140,7 +140,7 @@ export function DashboardOverviewClient({ initialData }: { initialData: Dashboar
 
   return (
     <section className={isPending ? "opacity-70 transition-opacity" : "transition-opacity"}>
-      <div className="section-enter mb-6 flex flex-col gap-5 lg:mb-7 lg:flex-row lg:items-end lg:justify-between">
+      <div className="section-enter mb-5 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="mb-2 text-xs font-extrabold uppercase tracking-[.16em] text-[var(--text-secondary)]">Auswertung</p>
           <h1 className="text-[30px] font-extrabold tracking-[-.04em] sm:text-[32px] lg:text-[34px]">Dashboard</h1>

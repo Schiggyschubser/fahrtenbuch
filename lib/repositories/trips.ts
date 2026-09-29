@@ -9,9 +9,25 @@ import type { MonthDataDto, TripCsvImportResultDto, TripDateRangeDto, TripDto } 
 import { tripCsvDuplicateKey, type TripCsvRow } from "../trip-csv";
 import { getActiveRoutePair } from "./routes";
 import { getReimbursementSettings } from "./settings";
+import { getRemarkSettings } from "./remarks";
 
 export function tripToDto(row: typeof trips.$inferSelect): TripDto {
+  const pair = row.routePairId !== null && row.direction !== null
+    ? sqlite.prepare("SELECT place_a AS placeA, place_b AS placeB, place_a_full_name AS placeAFullName, place_b_full_name AS placeBFullName FROM route_pairs WHERE id = ?").get(row.routePairId) as { placeA: string; placeB: string; placeAFullName: string; placeBFullName: string } | undefined
+    : undefined;
+  const origin = row.direction === "A_TO_B" ? pair?.placeA : pair?.placeB;
+  const destination = row.direction === "A_TO_B" ? pair?.placeB : pair?.placeA;
+  const matches = (snapshot: string, current: string | undefined) => current !== undefined
+    && snapshot.trim().replace(/\s+/g, " ").localeCompare(current, "de", { sensitivity: "base" }) === 0;
   return {
+    originFullName: row.routePairId === null ? row.originFullNameSnapshot : matches(row.originSnapshot, origin) ? (row.direction === "A_TO_B" ? pair!.placeAFullName : pair!.placeBFullName) : "",
+    destinationFullName: row.routePairId === null ? row.destinationFullNameSnapshot : matches(row.destinationSnapshot, destination) ? (row.direction === "A_TO_B" ? pair!.placeBFullName : pair!.placeAFullName) : "",
+    accompanyingStaff: row.accompanyingStaff,
+    remark: row.remark,
+    sequenceNumber: (sqlite.prepare(`SELECT COUNT(*) + 1 AS number FROM trips
+      WHERE date < ? OR (date = ? AND start_time < ?)
+      OR (date = ? AND start_time = ? AND id < ?)`)
+      .get(row.date, row.date, row.startTime, row.date, row.startTime, row.id) as { number: number }).number,
     id: row.id,
     date: row.date,
     startTime: row.startTime,
@@ -69,6 +85,8 @@ export async function getTrip(id: number) {
 }
 
 type TripInput = {
+  accompanyingStaff?: string;
+  remark?: string;
   date: string;
   startTime: string;
   endTime: string;
@@ -107,23 +125,16 @@ export function getTripDateRange(): TripDateRangeDto {
 export async function importTripsFromCsv(rows: TripCsvRow[]): Promise<TripCsvImportResultDto> {
   ensureDatabaseReady();
   const existingRows = await db.select().from(trips);
-  const existingKeys = new Set(existingRows.map((row) => {
-    const dto = tripToDto(row);
-    return tripCsvDuplicateKey({
-      date: dto.date,
-      startTime: dto.startTime,
-      endTime: dto.endTime,
-      routeLabel: dto.routeLabel,
-      odometerStart: dto.odometerStart,
-      odometerEnd: dto.odometerEnd,
-    });
-  }));
+  const existingDtos = existingRows.map(tripToDto);
+  const existingLegacyKeys = new Set(existingDtos.map((row) => tripCsvDuplicateKey(row)));
+  const existingExtendedKeys = new Set(existingDtos.map((row) => tripCsvDuplicateKey(row, true)));
   const pendingKeys = new Set<string>();
   const pending: TripCsvRow[] = [];
   let skipped = 0;
   for (const row of rows) {
-    const key = tripCsvDuplicateKey(row);
-    if (existingKeys.has(key) || pendingKeys.has(key)) {
+    const extended = row.remark !== undefined;
+    const key = tripCsvDuplicateKey(row, extended);
+    if ((extended ? existingExtendedKeys : existingLegacyKeys).has(key) || pendingKeys.has(key)) {
       skipped += 1;
       continue;
     }
@@ -142,8 +153,9 @@ export async function importTripsFromCsv(rows: TripCsvRow[]): Promise<TripCsvImp
       date, start_time, end_time, route_pair_id, direction,
       origin_snapshot, destination_snapshot, distance_km_snapshot,
       reimbursed_km_snapshot, reimbursement_rate_cents_snapshot,
-      odometer_start, is_checked, created_at, updated_at
-    ) VALUES (?, ?, ?, NULL, NULL, ?, '', ?, ?, 40, ?, 0, ?, ?)
+      odometer_start, is_checked, created_at, updated_at,
+      origin_full_name_snapshot, destination_full_name_snapshot, accompanying_staff, remark
+    ) VALUES (?, ?, ?, NULL, NULL, ?, '', ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?)
   `);
   sqlite.transaction(() => {
     for (const row of pending) {
@@ -154,10 +166,15 @@ export async function importTripsFromCsv(rows: TripCsvRow[]): Promise<TripCsvImp
         row.endTime,
         row.routeLabel,
         distanceKm,
-        distanceKm,
+        row.reimbursedKm ?? distanceKm,
+        row.reimbursementRateCents ?? 40,
         row.odometerStart,
         now,
         now,
+        row.originFullName ?? "",
+        row.destinationFullName ?? "",
+        row.accompanyingStaff ?? "",
+        row.remark ?? "",
       );
     }
   })();
@@ -176,9 +193,13 @@ export async function createTrip(input: TripInput) {
     getReimbursementSettings(),
   ]);
   if (!pair) throw new Error("Der gewählte Reiseweg ist nicht mehr verfügbar.");
+  const remarkSettings = input.remark === undefined ? getRemarkSettings() : null;
+  const defaultRemark = remarkSettings?.templates.find((template) => template.id === remarkSettings.defaultTemplateId)?.text ?? "";
   const now = new Date().toISOString();
   const [created] = await db.insert(trips).values({
     ...input,
+    accompanyingStaff: input.accompanyingStaff?.trim() ?? "",
+    remark: input.remark?.trim() ?? defaultRemark,
     ...routeSnapshot(pair, input.direction),
     reimbursementRateCentsSnapshot: settings.reimbursementRateCents,
     createdAt: now,
@@ -199,12 +220,16 @@ export async function updateTrip(id: number, input: Omit<TripInput, "routePairId
     const pair = await getActiveRoutePair(input.routePairId);
     if (!pair) throw new Error("Der gewählte Reiseweg ist nicht mehr verfügbar.");
     routeValues = {
+      originFullNameSnapshot: "",
+      destinationFullNameSnapshot: "",
       routePairId: input.routePairId,
       direction: input.direction,
       ...routeSnapshot(pair, input.direction),
     };
   }
   const [updated] = await db.update(trips).set({
+    accompanyingStaff: input.accompanyingStaff?.trim() ?? existing.accompanyingStaff,
+    remark: input.remark?.trim() ?? existing.remark,
     date: input.date,
     startTime: input.startTime,
     endTime: input.endTime,

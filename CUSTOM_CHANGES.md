@@ -2,6 +2,15 @@
 
 Ausgangsbasis ist das unveränderte Fahrtenbuch **1.0.4** unter MIT-Lizenz. Ab diesem Stand erhält jede zusammengehörige Änderung eine fortlaufende Versionsnummer ohne `custom`-Suffix.
 
+## 1.0.11
+
+- Funktionen aus den Upstream-Versionen 1.0.8 und 1.0.9 integriert: Fahrttexte, Bemerkungsvorlagen, Kennzeichen, Spaltenauswahl, vollständiger CSV-Austausch und mehrseitiger A4-/PDF-Druck.
+- Direkte Zeiteingabe `0815` → `08:15`; Uhr-Popup nur auf ausdrücklichen Klick.
+- Eigene Themes und Footer beibehalten; Druckfarben unabhängig vom Theme.
+- Sicherheitskorrekturen für Abhängigkeiten übernommen.
+- Compose auf das feste Release-Image 1.0.11 gesetzt.
+- Details, Herkunft, Test und Rollback: [RELEASE_NOTES.md](RELEASE_NOTES.md).
+
 ## 1.0.10
 
 - Theme-Auswahl auf zehn moderne Fahrtenbuch-Designs erweitert.

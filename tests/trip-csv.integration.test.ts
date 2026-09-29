@@ -51,16 +51,11 @@ describe("CSV-Import und -Export", () => {
     });
 
     const exported = await getTripsForDateRange("2026-07-28", "2026-07-28");
-    const parsed = parseTripCsv(serializeTripCsv(exported.map((trip) => ({
-      date: trip.date,
-      startTime: trip.startTime,
-      endTime: trip.endTime,
-      routeLabel: trip.routeLabel,
-      odometerStart: trip.odometerStart,
-      odometerEnd: trip.odometerEnd,
-    }))));
+    const parsed = parseTripCsv(serializeTripCsv(exported));
 
     expect(parsed).toEqual([{
+      originFullName: "", destinationFullName: "", accompanyingStaff: "", remark: "",
+      distanceKm: 18, reimbursedKm: 14, unreimbursedKm: 4, reimbursementRateCents: 40, potentialReimbursementCents: 560,
       date: "2026-07-28",
       startTime: "08:00",
       endTime: "08:30",

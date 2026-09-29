@@ -114,3 +114,23 @@ describe("Fahrten-Repository", () => {
     expect(updated?.isChecked).toBe(true);
   });
 });
+
+ describe("Ausgeschriebene Orte", () => {
+  it("ergaenzt bestehende Fahrten in beiden Richtungen und bewahrt die Zuordnung", async () => {
+    const input = { placeA: "HH", placeB: "B", distanceKm: 10, reimbursedKm: 10, durationMinutes: 20 };
+    const route = await createRoutePair(input);
+    const forward = await createTrip({ date: "2030-01-01", startTime: "08:00", endTime: "08:20", odometerStart: 0, routePairId: route.id, direction: "A_TO_B" });
+    const reverse = await createTrip({ date: "2030-01-01", startTime: "09:00", endTime: "09:20", odometerStart: 10, routePairId: route.id, direction: "B_TO_A" });
+    expect(forward.originFullName).toBe("");
+    await updateRoutePair(route.id, { ...input, placeAFullName: " Hamburg  Zentrale ", placeBFullName: "Berlin" });
+    const rows = (await getTripsForMonth("2030-01")).trips;
+    expect(rows[0]).toMatchObject({ originFullName: "Hamburg Zentrale", destinationFullName: "Berlin" });
+    expect(rows[1]).toMatchObject({ originFullName: "Berlin", destinationFullName: "Hamburg Zentrale" });
+    await updateRoutePair(route.id, { ...input, placeA: "M", placeAFullName: "Muenchen" });
+    expect((await getTripsForMonth("2030-01")).trips[0]).toMatchObject({ origin: "HH", originFullName: "", destinationFullName: "Berlin" });
+    await archiveRoutePair(route.id);
+    expect((await getTripsForMonth("2030-01")).trips[1].originFullName).toBe("Berlin");
+    await deleteTrip(forward.id);
+    await deleteTrip(reverse.id);
+  });
+});
