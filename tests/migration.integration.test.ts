@@ -25,6 +25,7 @@ it("upgrades a populated 1.0.10 database without changing existing data and can 
       });
       expect(database.prepare("SELECT accompanying_staff, remark FROM trips").get()).toEqual({ accompanying_staff: "", remark: "" });
       expect(database.prepare("SELECT COUNT(*) AS count FROM remark_templates").get()).toEqual({ count: 0 });
+      expect(database.prepare("SELECT COUNT(*) AS count FROM mobile_trip_submissions").get()).toEqual({ count: 0 });
       expect(database.pragma("integrity_check", { simple: true })).toBe("ok");
       expect(database.pragma("foreign_key_check")).toEqual([]);
     }

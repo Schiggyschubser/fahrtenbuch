@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, gte, lt, lte, or } from "drizzle-orm";
 import { db, ensureDatabaseReady, sqlite } from "../db";
-import { trips, type Direction } from "../db/schema";
+import { appSettings, routePairs, trips, type Direction } from "../db/schema";
 import { createBackup } from "../backups";
 import { monthBounds } from "../dates";
 import { unreimbursedKm } from "../kilometers";
@@ -8,7 +8,6 @@ import { potentialReimbursementCents } from "../money";
 import type { MonthDataDto, TripCsvImportResultDto, TripDateRangeDto, TripDto } from "../types";
 import { tripCsvDuplicateKey, type TripCsvRow } from "../trip-csv";
 import { getActiveRoutePair } from "./routes";
-import { getReimbursementSettings } from "./settings";
 import { getRemarkSettings } from "./remarks";
 
 export function tripToDto(row: typeof trips.$inferSelect): TripDto {
@@ -187,16 +186,20 @@ export async function importTripsFromCsv(rows: TripCsvRow[]): Promise<TripCsvImp
 }
 
 export async function createTrip(input: TripInput) {
+  return createTripSync(input);
+}
+
+// Synchronous so mobile submissions and their receipt can commit atomically.
+export function createTripSync(input: TripInput) {
   ensureDatabaseReady();
-  const [pair, settings] = await Promise.all([
-    getActiveRoutePair(input.routePairId),
-    getReimbursementSettings(),
-  ]);
-  if (!pair) throw new Error("Der gewählte Reiseweg ist nicht mehr verfügbar.");
+  const pair = db.select().from(routePairs).where(eq(routePairs.id, input.routePairId)).get();
+  const settings = db.select().from(appSettings).where(eq(appSettings.id, 1)).get();
+  if (!pair || pair.archivedAt) throw new Error("Der gewählte Reiseweg ist nicht mehr verfügbar.");
+  if (!settings) throw new Error("Die Abrechnungseinstellungen konnten nicht geladen werden.");
   const remarkSettings = input.remark === undefined ? getRemarkSettings() : null;
   const defaultRemark = remarkSettings?.templates.find((template) => template.id === remarkSettings.defaultTemplateId)?.text ?? "";
   const now = new Date().toISOString();
-  const [created] = await db.insert(trips).values({
+  const created = db.insert(trips).values({
     ...input,
     accompanyingStaff: input.accompanyingStaff?.trim() ?? "",
     remark: input.remark?.trim() ?? defaultRemark,
@@ -204,7 +207,7 @@ export async function createTrip(input: TripInput) {
     reimbursementRateCentsSnapshot: settings.reimbursementRateCents,
     createdAt: now,
     updatedAt: now,
-  }).returning();
+  }).returning().get();
   return tripToDto(created);
 }
 

@@ -1,5 +1,30 @@
 [
   {
+    "version": "1.0.12",
+    "date": "2026-09-29",
+    "title": "Android-API mit Token-Anmeldung und sicherer Wiederholung von Fahrten",
+    "fileCount": 17,
+    "files": [
+      "ANDROID_API.md",
+      "README.md",
+      "RELEASE_NOTES.md",
+      "VERSION",
+      "app/api/v1/[...path]/route.ts",
+      "docker-compose.yaml",
+      "lib/changelog.json",
+      "lib/db/index.ts",
+      "lib/mobile-api.ts",
+      "lib/mobile-auth.ts",
+      "lib/mobile-trips.ts",
+      "lib/repositories/trips.ts",
+      "package-lock.json",
+      "package.json",
+      "tests/container-smoke.mjs",
+      "tests/migration.integration.test.ts",
+      "tests/mobile-api.integration.test.ts"
+    ]
+  },
+  {
     "version": "1.0.11",
     "date": "2026-09-29",
     "title": "PDF-Druck, vollständiger CSV-Austausch, Fahrtangaben und direkte Zeiteingabe",

@@ -196,6 +196,17 @@ export function ensureDatabaseReady() {
   }
   ensureAppSettings();
   ensureTwoFactorSchema();
+  // Receipts survive trip deletion to prevent an offline retry recreating it.
+  state.sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS mobile_trip_submissions (
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      client_trip_id TEXT NOT NULL,
+      request_hash TEXT NOT NULL,
+      response_json TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (user_id, client_trip_id)
+    );
+  `);
 
   const existingUser = state.sqlite.prepare("SELECT id FROM users LIMIT 1").get();
   if (!existingUser) {

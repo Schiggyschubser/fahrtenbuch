@@ -1,6 +1,8 @@
 # Fahrtenbuch Custom – lokale Entwicklungsbasis
 
-Aktuelle Erweiterungen und Updatehinweise: [Version 1.0.11](RELEASE_NOTES.md). Der produktive Compose-Stand verwendet das eigene versionierte GHCR-Image. PDF-Ausgabe erfolgt über die Druckansicht, Import und Export von Fahrtdaten erfolgen per CSV. Uhrzeiten können direkt als vier Ziffern eingegeben werden, etwa `0815` für `08:15`.
+Version **1.0.12**: [Android-API v1](ANDROID_API.md) mit Bearer-Anmeldung, bestehender Zwei-Faktor-Prüfung und idempotenter Übernahme von Fahrten. Versioniertes Image: `ghcr.io/schiggyschubser/fahrtenbuch:1.0.12`.
+
+Aktuelle Erweiterungen und Updatehinweise: [Version 1.0.12](RELEASE_NOTES.md). Der produktive Compose-Stand verwendet das eigene versionierte GHCR-Image. PDF-Ausgabe erfolgt über die Druckansicht, Import und Export von Fahrtdaten erfolgen per CSV. Uhrzeiten können direkt als vier Ziffern eingegeben werden, etwa `0815` für `08:15`.
 
 Diese Version basiert auf dem Projekt **Fahrtenbuch 1.0.4**. Die konkrete Version dieses Projektstands steht in der Datei `VERSION` und wird auch im Footer der Anwendung angezeigt. Der Ordner ist so vorbereitet, dass du ihn auf deinen Docker-Host kopieren, lokal bauen und anschließend mit fortlaufender Versionsnummer weiterentwickeln kannst.
 
