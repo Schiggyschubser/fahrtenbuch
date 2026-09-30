@@ -1,3 +1,34 @@
+# Version 1.0.13 · 30.09.2026
+
+- Android-API: `GET /api/v1/trips/:id`, `PUT /api/v1/trips/:id` und `DELETE /api/v1/trips/:id`.
+- `bootstrap.capabilities.tripManagement` kennzeichnet die Unterstützung; Fahrtantworten enthalten `updatedAt`.
+- Änderungen und Löschungen verlangen `expectedUpdatedAt`; ein zwischenzeitlich geänderter Fahrtstand liefert 409 `TRIP_CHANGED`.
+- Änderungen an Datum, Uhrzeiten, Kilometerstand und Text erhalten bestehende Reiseweg-/Kilometer-Snapshots. Auch historische CSV-Fahrten sind so bearbeitbar.
+- Die ursprüngliche mobile Empfangsbestätigung bleibt nach Bearbeiten oder Löschen unverändert; ein Übertragungs-Retry erzeugt keine zusätzliche Fahrt.
+- Keine neue Datenbanktabelle oder Migration. Vor Aktivierung konsistente Sicherung erstellen; bisheriges Image für einen Rollback behalten.
+- Next.js und eslint-config-next auf die feste Patch-Version 16.3.8 aktualisiert; Abhängigkeitsprüfung vor Aktivierung erneut durchgeführt.
+
+## Image und Compose
+
+`docker-compose.yaml` verwendet `ghcr.io/schiggyschubser/fahrtenbuch:1.0.13`.
+Der GitHub-Workflow veröffentlicht das Image für Linux AMD64 und ARM64 sowie
+das GitHub-Release `v1.0.13`. Port `1357:3000`, Datenverzeichnis
+`./data:/app/data`, Netzwerke und Umgebungsvariablen bleiben unverändert.
+
+## Kurztest und Rollback für 1.0.13
+
+- Vor und nach der Compose-Änderung `docker compose config --quiet` ausführen;
+  vorher die bisherige Compose-Datei sichern und das bisherige Image behalten.
+- Nach einer freigegebenen Aktivierung muss der Container `healthy` sein und
+  `/login` Version 1.0.13 anzeigen. `/api/v1/me` ohne Token muss HTTP 401 liefern.
+- Bearbeiten, Löschen, Revisionskonflikte und Übertragungswiederholungen nur mit
+  Testdaten prüfen; `tests/container-smoke.mjs` ist für eine isolierte Testinstanz.
+- Für den Rollback die gesicherte Compose-Datei wiederherstellen, mit
+  `docker compose config --quiet` prüfen und nach Freigabe
+  `docker compose up -d --no-build --pull never fahrtenbuch` ausführen.
+  Die aktuelle Datenbank beibehalten; keine Migration oder Datenrücksicherung
+  ist für diesen Versionswechsel erforderlich.
+
 # Fahrtenbuch 1.0.12
 
 Die neue Android-API nimmt Fahrten einer nativen App entgegen. App-Einträge erscheinen im selben Fahrtenbuch wie Eingaben über die Weboberfläche.

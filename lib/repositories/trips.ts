@@ -28,6 +28,7 @@ export function tripToDto(row: typeof trips.$inferSelect): TripDto {
       OR (date = ? AND start_time = ? AND id < ?)`)
       .get(row.date, row.date, row.startTime, row.date, row.startTime, row.id) as { number: number }).number,
     id: row.id,
+    updatedAt: row.updatedAt,
     date: row.date,
     startTime: row.startTime,
     endTime: row.endTime,
@@ -214,10 +215,11 @@ export function createTripSync(input: TripInput) {
 export async function updateTrip(id: number, input: Omit<TripInput, "routePairId" | "direction"> & {
   routePairId?: number;
   direction?: Direction;
-}) {
+}, expectedUpdatedAt?: string) {
   ensureDatabaseReady();
   const existing = await getTrip(id);
   if (!existing) return null;
+  if (expectedUpdatedAt !== undefined && existing.updatedAt !== expectedUpdatedAt) return null;
   let routeValues = {};
   if (input.routePairId && input.direction) {
     const pair = await getActiveRoutePair(input.routePairId);
@@ -238,14 +240,16 @@ export async function updateTrip(id: number, input: Omit<TripInput, "routePairId
     endTime: input.endTime,
     odometerStart: input.odometerStart,
     ...routeValues,
-    updatedAt: new Date().toISOString(),
-  }).where(eq(trips.id, id)).returning();
+    updatedAt: new Date(Math.max(Date.now(), Date.parse(existing.updatedAt) + 1)).toISOString(),
+  }).where(expectedUpdatedAt === undefined ? eq(trips.id, id) :
+    and(eq(trips.id, id), eq(trips.updatedAt, expectedUpdatedAt))).returning();
   return updated ? tripToDto(updated) : null;
 }
 
-export async function deleteTrip(id: number) {
+export async function deleteTrip(id: number, expectedUpdatedAt?: string) {
   ensureDatabaseReady();
-  const [deleted] = await db.delete(trips).where(eq(trips.id, id)).returning({ id: trips.id });
+  const [deleted] = await db.delete(trips).where(expectedUpdatedAt === undefined ? eq(trips.id, id) :
+    and(eq(trips.id, id), eq(trips.updatedAt, expectedUpdatedAt))).returning({ id: trips.id });
   return deleted ?? null;
 }
 

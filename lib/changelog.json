@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.0.13",
+    "date": "2026-09-30",
+    "title": "Fahrten über die Android-API bearbeiten und löschen",
+    "fileCount": 15,
+    "files": ["ANDROID_API.md", "README.md", "RELEASE_NOTES.md", "VERSION", "app/api/v1/[...path]/route.ts", "docker-compose.yaml", "lib/changelog.json", "lib/mobile-api.ts", "lib/mobile-trips.ts", "lib/repositories/trips.ts", "lib/types.ts", "package-lock.json", "package.json", "tests/container-smoke.mjs", "tests/mobile-api.integration.test.ts"]
+  },
+  {
     "version": "1.0.12",
     "date": "2026-09-29",
     "title": "Android-API mit Token-Anmeldung und sicherer Wiederholung von Fahrten",

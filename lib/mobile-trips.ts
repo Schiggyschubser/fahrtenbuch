@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { ensureDatabaseReady, sqlite } from "./db";
-import { createTripSchema, dateSchema, directionSchema } from "./validation";
+import { createTripSchema, updateTripSchema, dateSchema, directionSchema } from "./validation";
 import { createTripSync } from "./repositories/trips";
 import type { TripDto } from "./types";
 
@@ -21,6 +21,24 @@ export const mobileTripSchema = z.strictObject({
   remark: z.string().trim().max(2000).optional(),
 }).superRefine((value, context) => {
   const result = createTripSchema.safeParse(value);
+  if (!result.success) for (const issue of result.error.issues) {
+    context.addIssue({ code: "custom", path: issue.path, message: issue.message });
+  }
+});
+
+export const mobileTripRevisionSchema = z.strictObject({ expectedUpdatedAt: z.string().min(1).max(80) });
+export const mobileTripUpdateSchema = z.strictObject({
+  expectedUpdatedAt: z.string().min(1).max(80),
+  date: dateSchema,
+  startTime: z.string(),
+  endTime: z.string(),
+  odometerStart: z.number(),
+  routePairId: z.number().optional(),
+  direction: directionSchema.optional(),
+  accompanyingStaff: z.string().trim().max(2000).optional(),
+  remark: z.string().trim().max(2000).optional(),
+}).superRefine((value, context) => {
+  const result = updateTripSchema.safeParse(value);
   if (!result.success) for (const issue of result.error.issues) {
     context.addIssue({ code: "custom", path: issue.path, message: issue.message });
   }

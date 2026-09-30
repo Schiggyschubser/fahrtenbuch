@@ -3,10 +3,10 @@ import { ZodError, z } from "zod";
 import { ensureDatabaseReady, sqlite } from "./db";
 import { maybeCreateAutomaticBackup } from "./backups";
 import { allowMobileLogin, createMobileSession, mobileUser } from "./mobile-auth";
-import { MobileApiError, submitMobileTrip } from "./mobile-trips";
+import { MobileApiError, mobileTripRevisionSchema, mobileTripUpdateSchema, submitMobileTrip } from "./mobile-trips";
 import { beginTwoFactorLogin, completeTwoFactorLogin } from "./repositories/two-factor";
 import { getActiveRoutePairs } from "./repositories/routes";
-import { getSuggestedOdometer, getTripsForMonth } from "./repositories/trips";
+import { deleteTrip, getTrip, getSuggestedOdometer, getTripsForMonth, tripToDto, updateTrip } from "./repositories/trips";
 import { getRemarkSettings } from "./repositories/remarks";
 import { getReimbursementSettings, getVehicleSettings } from "./repositories/settings";
 import { dateSchema, loginSchema, monthSchema, twoFactorChallengeSchema } from "./validation";
@@ -61,6 +61,35 @@ export async function handleMobileApi(request: Request, path: string[]) {
     const user = mobileUser(request);
     if (!user) return json({ code: "UNAUTHORIZED", error: "Gültiges Bearer-Token erforderlich." }, 401, { "WWW-Authenticate": "Bearer" });
     const params = new URL(request.url).searchParams;
+    if (path.length === 2 && path[0] === "trips" && /^\d+$/.test(path[1])) {
+      const id = z.coerce.number().int().positive().max(Number.MAX_SAFE_INTEGER).parse(path[1]);
+      if (!["GET", "PUT", "PATCH", "DELETE"].includes(request.method)) return json({ code: "METHOD_NOT_ALLOWED", error: "Methode nicht unterstützt." }, 405);
+      if (request.method === "GET") {
+        const trip = await getTrip(id);
+        if (!trip) throw new MobileApiError(404, "TRIP_NOT_FOUND", "Die Fahrt existiert nicht mehr.");
+        return json({ trip: tripToDto(trip) });
+      }
+      const raw = await readJson(request);
+      const input = request.method === "DELETE" ? mobileTripRevisionSchema.parse(raw) : mobileTripUpdateSchema.parse(raw);
+      const existing = await getTrip(id);
+      if (!existing) {
+        if (request.method === "DELETE") return json({ deleted: true, id });
+        throw new MobileApiError(404, "TRIP_NOT_FOUND", "Die Fahrt existiert nicht mehr.");
+      }
+      if (existing.updatedAt !== input.expectedUpdatedAt) throw new MobileApiError(409, "TRIP_CHANGED", "Die Fahrt wurde zwischenzeitlich geändert. Bitte aktualisieren und erneut prüfen.");
+      await maybeCreateAutomaticBackup();
+      if (request.method === "DELETE") {
+        if (!await deleteTrip(id, input.expectedUpdatedAt)) throw new MobileApiError(409, "TRIP_CHANGED", "Die Fahrt wurde zwischenzeitlich geändert. Bitte aktualisieren.");
+        return json({ deleted: true, id });
+      }
+      const { expectedUpdatedAt, ...changes } = mobileTripUpdateSchema.parse(raw);
+      if (changes.routePairId && !sqlite.prepare("SELECT id FROM route_pairs WHERE id=? AND archived_at IS NULL").get(changes.routePairId)) {
+        throw new MobileApiError(409, "ROUTE_UNAVAILABLE", "Der gewählte Reiseweg ist nicht mehr verfügbar. Bitte Reisewege aktualisieren.");
+      }
+      const updated = await updateTrip(id, changes, expectedUpdatedAt);
+      if (!updated) throw new MobileApiError(409, "TRIP_CHANGED", "Die Fahrt wurde zwischenzeitlich geändert. Bitte aktualisieren.");
+      return json({ trip: updated });
+    }
     switch (endpoint) {
       case "POST auth/logout":
         sqlite.prepare("DELETE FROM sessions WHERE token_hash = ?").run(user.tokenHash);
@@ -69,7 +98,7 @@ export async function handleMobileApi(request: Request, path: string[]) {
         return json({ user: { id: user.id, username: user.username }, apiVersion: 1 });
       case "GET bootstrap":
         return json({ apiVersion: 1, routes: await getActiveRoutePairs(), vehicle: await getVehicleSettings(),
-          reimbursement: await getReimbursementSettings(), remarks: getRemarkSettings() });
+          reimbursement: await getReimbursementSettings(), remarks: getRemarkSettings(), capabilities: { tripManagement: true } });
       case "GET routes":
         return json({ routes: await getActiveRoutePairs() });
       case "GET trips":

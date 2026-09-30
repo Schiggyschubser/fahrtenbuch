@@ -74,7 +74,26 @@ Fehlerformat: `{code:"VALIDATION_ERROR",error:"…",issues:[{path:["date"],messa
 | 429 `RATE_LIMITED` | `Retry-After` beachten |
 | 500 `INTERNAL_ERROR`, Timeout oder Verbindungsabbruch | Mit derselben UUID und gleichem Inhalt verzögert wiederholen |
 
-Nach 200 oder 201 als synchronisiert markieren und `trip.id` speichern. Bei unbekanntem Ausgang Payload unverändert behalten. Einzelne Fahrten nacheinander übertragen; v1 bietet keinen Batch-Upload und keine Bearbeitungs- oder Lösch-Endpunkte. Bearbeitung weiterhin in der Weboberfläche. Vor dem Offlinebetrieb Reisewege laden und lokal zwischenspeichern.
+Nach 200 oder 201 als synchronisiert markieren und `trip.id` speichern. Bei unbekanntem Ausgang Payload unverändert behalten. Einzelne Fahrten nacheinander übertragen; v1 bietet keinen Batch-Upload. Vor dem Offlinebetrieb Reisewege laden und lokal zwischenspeichern.
+
+## Fahrten bearbeiten und löschen (Server 1.0.13)
+
+`GET /bootstrap` enthält zusätzlich `capabilities: {tripManagement: true}`. Aktuelle Fahrtantworten
+enthalten `updatedAt`. Das Fahrtenbuch bleibt gemeinsam: Bearer-Anmeldungen erhalten denselben
+Fahrtenbestand und dieselben Änderungsmöglichkeiten wie die Webanwendung.
+
+- `GET /trips/:id` liefert `{trip: {...}}`, bei einer fehlenden Fahrt 404 `TRIP_NOT_FOUND`.
+- `PUT /trips/:id` mit `expectedUpdatedAt`, `date`, `startTime`, `endTime`, `odometerStart`, optional
+  `accompanyingStaff`, `remark` und gemeinsam optional `routePairId`/`direction`; Antwort `{trip: {...}}`.
+  `PATCH` ist als Alias verfügbar. Keine `clientTripId` mitsenden: Es wird eine bestehende Fahrt geändert.
+- Ohne `routePairId`/`direction` bleiben die bisherigen Reiseweg- und Kilometer-Snapshots erhalten,
+  auch bei archivierten Reisewegen und historischen CSV-Fahrten. Bei neu gewähltem Reiseweg gelten dessen aktuelle Kilometer.
+- `DELETE /trips/:id` mit JSON `{expectedUpdatedAt: "..."}` liefert `{deleted: true, id}`.
+  Eine bereits fehlende Fahrt gilt bei wiederholtem Löschen ebenfalls als gelöscht.
+- `expectedUpdatedAt` muss dem zuletzt geladenen `trip.updatedAt` entsprechen. Sonst 409 `TRIP_CHANGED`;
+  erneut laden und die fremde Änderung prüfen. Authentifizierung, 16-KiB-Grenze und Validierung gelten weiterhin.
+- Bei Timeout nicht ungeprüft automatisch erneut ändern; den aktuellen Fahrtstand laden.
+  Die Empfangsbestätigung des ursprünglichen `POST /trips` bleibt dauerhaft unverändert.
 
 ## Test und Aktivierung
 

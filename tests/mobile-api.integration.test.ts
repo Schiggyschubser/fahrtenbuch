@@ -140,3 +140,53 @@ it("rate limits password attempts", async () => {
   expect(response.status).toBe(429);
   expect(response.headers.get("retry-after")).toBe("60");
 });
+
+it("edits and deletes shared trips with revision checks while retaining the original submission receipt", async () => {
+  token = createMobileSession(userId).accessToken;
+  const pair = await createRoutePair({ placeA: "Ändern A", placeB: "Ändern B", distanceKm: 20, reimbursedKm: 15, durationMinutes: 30 });
+  const input = { ...trip(), date: "2026-08-10", routePairId: pair.id };
+  const receipt = await (await call("POST", "trips", input)).json();
+  const id = receipt.trip.id;
+  const changes = { date: "2026-08-11", startTime: "09:00", endTime: "10:00", odometerStart: 15000,
+    remark: "Korrigiert", accompanyingStaff: "Müller", expectedUpdatedAt: receipt.trip.updatedAt };
+  for (const method of ["PUT", "DELETE"]) {
+    expect((await call(method, `trips/${id}`, method === "PUT" ? changes : { expectedUpdatedAt: receipt.trip.updatedAt }, null)).status).toBe(401);
+  }
+  // Existing distance snapshots survive edits to time/text, even when the route changes later.
+  await archiveRoutePair(pair.id);
+  const response = await call("PUT", `trips/${id}`, changes);
+  expect(response.status).toBe(200);
+  const updated = (await response.json()).trip;
+  expect(updated).toMatchObject({ id, date: changes.date, odometerStart: 15000, odometerEnd: 15020, remark: "Korrigiert", accompanyingStaff: "Müller", distanceKm: 20 });
+  expect(updated.updatedAt).not.toBe(receipt.trip.updatedAt);
+  expect((await call("PUT", `trips/${id}`, changes)).status).toBe(409);
+  expect((await call("DELETE", `trips/${id}`, { expectedUpdatedAt: receipt.trip.updatedAt })).status).toBe(409);
+  expect((await call("PUT", `trips/${id}`, { ...changes, expectedUpdatedAt: updated.updatedAt, endTime: "08:00" })).status).toBe(400);
+  expect((await call("PUT", `trips/${id}`, { ...changes, expectedUpdatedAt: updated.updatedAt, routePairId: pair.id, direction: "A_TO_B" })).status).toBe(409);
+  const read = await (await call("GET", `trips/${id}`)).json();
+  expect(read.trip).toEqual(updated);
+  expect(await (await call("POST", "trips", input)).json()).toEqual({ ...receipt, duplicate: true });
+  expect((await call("DELETE", `trips/${id}`, { expectedUpdatedAt: updated.updatedAt })).status).toBe(200);
+  expect((await call("DELETE", `trips/${id}`, { expectedUpdatedAt: updated.updatedAt })).status).toBe(200);
+  expect((await call("GET", `trips/${id}`)).status).toBe(404);
+  expect((await call("PUT", `trips/${id}`, { ...changes, expectedUpdatedAt: updated.updatedAt })).status).toBe(404);
+  expect((await call("POST", "trips", input)).status).toBe(200);
+  expect((await getTripsForMonth("2026-08")).trips).toHaveLength(0);
+  expect((await (await call("GET", "bootstrap")).json()).capabilities.tripManagement).toBe(true);
+});
+
+it("rejects simultaneous stale edits and preserves historic CSV route snapshots", async () => {
+  token = createMobileSession(userId).accessToken;
+  const pair = await createRoutePair({ placeA: "Parallel A", placeB: "Parallel B", distanceKm: 10, reimbursedKm: 10, durationMinutes: 20 });
+  const input = { ...trip(), date: "2026-07-10", routePairId: pair.id };
+  const receipt = await (await call("POST", "trips", input)).json();
+  const id = receipt.trip.id;
+  sqlite.prepare("UPDATE trips SET route_pair_id=NULL, direction=NULL, origin_snapshot='CSV-Strecke' WHERE id=?").run(id);
+  const changes = { date: input.date, startTime: input.startTime, endTime: input.endTime, odometerStart: 100,
+    remark: "CSV korrigiert", expectedUpdatedAt: receipt.trip.updatedAt };
+  const results = await Promise.all([call("PUT", `trips/${id}`, changes), call("PUT", `trips/${id}`, { ...changes, odometerStart: 200 })]);
+  expect(results.map((response) => response.status).sort()).toEqual([200, 409]);
+  const current = (await (await call("GET", `trips/${id}`)).json()).trip;
+  expect(current).toMatchObject({ routePairId: null, direction: null, origin: "CSV-Strecke", distanceKm: 10 });
+  expect((await call("DELETE", `trips/${id}`, { expectedUpdatedAt: current.updatedAt })).status).toBe(200);
+});

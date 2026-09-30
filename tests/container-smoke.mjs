@@ -12,7 +12,7 @@ async function start() {
   for (let i = 0; i < 100; i++) {
     try {
       const response = await fetch(`${base}/login`);
-      if (response.ok) { assert.match(await response.text(), /1\.0\.12/); return; }
+      if (response.ok) { assert.match(await response.text(), /1\.0\.13/); return; }
     } catch { /* startup */ }
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
@@ -57,7 +57,20 @@ try {
   const trips = (await webTrips.json()).trips;
   assert.equal(trips.length, 1);
   assert.equal(trips[0].id, saved.trip.id);
+  const mutation = (method, body) => fetch(`${base}/api/v1/trips/${saved.trip.id}`, {
+    method, headers: { Authorization, "Content-Type": "application/json" }, body: JSON.stringify(body),
+  });
+  const changed = await mutation("PUT", { expectedUpdatedAt: saved.trip.updatedAt, date: input.date,
+    startTime: input.startTime, endTime: input.endTime, odometerStart: 1100, remark: "Im Container geändert" });
+  assert.equal(changed.status, 200);
+  const updated = (await changed.json()).trip;
+  assert.equal(updated.odometerStart, 1100);
+  assert.equal(updated.odometerEnd, 1120);
+  assert.equal((await mutation("DELETE", { expectedUpdatedAt: saved.trip.updatedAt })).status, 409);
+  assert.equal((await mutation("DELETE", { expectedUpdatedAt: updated.updatedAt })).status, 200);
+  assert.equal((await post("/api/v1/trips", input, { Authorization })).status, 200);
+  assert.equal((await (await fetch(`${base}/api/trips?month=2026-09`, { headers: { Cookie } })).json()).trips.length, 0);
   assert.equal((await post("/api/v1/auth/logout", {}, { Authorization })).status, 200);
   assert.equal((await fetch(`${base}/api/v1/me`, { headers: { Authorization } })).status, 401);
-  console.log("Container smoke passed: web login, route creation, mobile login, bootstrap, trip, restart/retry persistence, web visibility, logout.");
+  console.log("Container smoke passed: web/mobile login, trip, restart/retry persistence, web visibility, edit/delete with revision checks, immutable receipt, logout.");
 } finally { await stop(); }

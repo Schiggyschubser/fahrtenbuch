@@ -8,3 +8,6 @@ export async function GET(request: Request, context: Context) {
   return handleMobileApi(request, (await context.params).path);
 }
 export const POST = GET;
+export const PATCH = GET;
+export const PUT = GET;
+export const DELETE = GET;
