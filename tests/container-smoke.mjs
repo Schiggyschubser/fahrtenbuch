@@ -13,7 +13,11 @@ async function start() {
   for (let i = 0; i < 100; i++) {
     try {
       const response = await fetch(`${base}/login`);
-      if (response.ok) { assert.match(await response.text(), /1\.0\.14/); return; }
+      if (response.ok) {
+        const { version } = JSON.parse((await import("node:fs")).readFileSync("package.json", "utf8"));
+        assert.ok((await response.text()).includes(`Version ${version}`));
+        return;
+      }
     } catch { /* startup */ }
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
@@ -94,7 +98,19 @@ try {
   assert.equal((await mutation("DELETE", { expectedUpdatedAt: updated.updatedAt })).status, 200);
   assert.equal((await post("/api/v1/trips", input, { Authorization })).status, 200);
   assert.equal((await (await fetch(`${base}/api/trips?month=2026-09`, { headers: { Cookie } })).json()).trips.length, 0);
+  for (const [placeA, placeB] of [["COII", "Zentrale"], ["AG", "COII"], ["COII", "Büro"]]) {
+    assert.equal((await post("/api/routes", { placeA, placeB, distanceKm: 20, reimbursedKm: 15, durationMinutes: 30 }, { Cookie })).status, 201);
+  }
+  for (const path of ["/api/routes", "/api/v1/routes", "/api/v1/bootstrap"]) {
+    const response = await fetch(`${base}${path}?q=Coii`, { headers: { Cookie, Authorization } });
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.deepEqual(body.routeOptions.map(option => option.label), [
+      "COII → AG", "COII → Büro", "COII → Zentrale", "AG → COII", "Büro → COII", "Zentrale → COII",
+    ]);
+    assert.equal(body.routes.length, 4);
+  }
   assert.equal((await post("/api/v1/auth/logout", {}, { Authorization })).status, 200);
   assert.equal((await fetch(`${base}/api/v1/me`, { headers: { Authorization } })).status, 401);
-  console.log("Container smoke passed: web/mobile login, trip, restart/retry persistence, web visibility, edit/delete with revision checks, immutable receipt, logout, claim template and signature validation/persistence/removal, both form pages.");
+  console.log("Container smoke passed: web/mobile login, trip, restart/retry persistence, web visibility, edit/delete with revision checks, immutable receipt, logout, claim template and signature validation/persistence/removal, both form pages, route search order through web/mobile APIs and bootstrap.");
 } finally { await stop(); }

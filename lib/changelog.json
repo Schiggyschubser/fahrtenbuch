@@ -1,5 +1,31 @@
 [
   {
+    "version": "1.0.15",
+    "date": "2026-10-03",
+    "title": "Reisewegsuche alphabetisch mit Vorrang für den Suchanfang; gemeinsame Reihenfolge in Web und Android-API",
+    "fileCount": 18,
+    "files": [
+      "ANDROID_API.md",
+      "README.md",
+      "RELEASE_NOTES.md",
+      "ROUTE_SEARCH_CHANGE.md",
+      "VERSION",
+      "app/api/routes/route.ts",
+      "components/TripModal.tsx",
+      "docker-compose.yaml",
+      "lib/mobile-api.ts",
+      "lib/repositories/routes.ts",
+      "lib/route-options.ts",
+      "package-lock.json",
+      "package.json",
+      "tests/container-smoke.mjs",
+      "tests/e2e/remarks.spec.ts",
+      "tests/e2e/route-search.spec.ts",
+      "tests/route-options.test.ts",
+      "tests/route-search-api.integration.test.ts"
+    ]
+  },
+  {
     "version": "1.0.14",
     "date": "2026-10-02",
     "title": "Bearbeitbarer Reisekostenantrag mit optionaler Unterschrift vor dem PDF-Fahrtennachweis und lesbare Zeitraum-Auswahl",

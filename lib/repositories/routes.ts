@@ -1,8 +1,10 @@
 import { and, eq, isNull } from "drizzle-orm";
 import { db, ensureDatabaseReady } from "../db";
-import { routePairs, type Direction } from "../db/schema";
+import { routePairs } from "../db/schema";
 import { unreimbursedKm } from "../kilometers";
-import type { RouteOptionDto, RoutePairDto } from "../types";
+import type { RoutePairDto } from "../types";
+
+export { toRouteOptions } from "../route-options";
 
 function normalizePlace(value: string) {
   return value.trim().replace(/\s+/g, " ");
@@ -31,30 +33,6 @@ export async function getActiveRoutePairs(): Promise<RoutePairDto[]> {
     ...row,
     unreimbursedKm: unreimbursedKm(row.distanceKm, row.reimbursedKm),
   })).toSorted((a, b) => `${a.placeA}${a.placeB}`.localeCompare(`${b.placeA}${b.placeB}`, "de"));
-}
-
-export function toRouteOptions(pairs: RoutePairDto[]): RouteOptionDto[] {
-  return pairs.flatMap((pair) => ([
-    option(pair, "A_TO_B"),
-    option(pair, "B_TO_A"),
-  ])).toSorted((a, b) => a.label.localeCompare(b.label, "de"));
-}
-
-function option(pair: RoutePairDto, direction: Direction): RouteOptionDto {
-  const origin = direction === "A_TO_B" ? pair.placeA : pair.placeB;
-  const destination = direction === "A_TO_B" ? pair.placeB : pair.placeA;
-  return {
-    value: `${pair.id}:${direction}`,
-    routePairId: pair.id,
-    direction,
-    origin,
-    destination,
-    distanceKm: pair.distanceKm,
-    reimbursedKm: pair.reimbursedKm,
-    unreimbursedKm: pair.unreimbursedKm,
-    durationMinutes: pair.durationMinutes,
-    label: `${origin} → ${destination}`,
-  };
 }
 
 export async function getActiveRoutePair(id: number) {

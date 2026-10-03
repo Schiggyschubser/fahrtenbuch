@@ -6,6 +6,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import type { RemarkSettingsDto, RouteOptionDto, TripDto } from "@/lib/types";
 import { normalizeTimeInput } from "@/lib/time-input";
+import { searchRouteOptions } from "@/lib/route-options";
 import { Modal } from "./Modal";
 import { useAnimatedPresence } from "./useAnimatedPresence";
 
@@ -139,11 +140,8 @@ function RouteCombobox({ value, options, onTextChange, onSelect }: {
   const menuRef = useRef<HTMLDivElement>(null);
   const menuPresence = useAnimatedPresence(open);
   const [menuPosition, setMenuPosition] = useState<{ left: number; top: number; width: number; maxHeight: number } | null>(null);
-  const query = value.trim().toLocaleLowerCase("de-DE");
   const hasExactSelection = options.some((option) => option.label === value);
-  const filteredOptions = query && !hasExactSelection
-    ? options.filter((option) => option.label.toLocaleLowerCase("de-DE").includes(query))
-    : options;
+  const filteredOptions = searchRouteOptions(options, hasExactSelection ? "" : value);
 
   useEffect(() => {
     function closeOnOutsideClick(event: MouseEvent) {

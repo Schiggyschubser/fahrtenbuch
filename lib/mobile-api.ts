@@ -5,7 +5,7 @@ import { maybeCreateAutomaticBackup } from "./backups";
 import { allowMobileLogin, createMobileSession, mobileUser } from "./mobile-auth";
 import { MobileApiError, mobileTripRevisionSchema, mobileTripUpdateSchema, submitMobileTrip } from "./mobile-trips";
 import { beginTwoFactorLogin, completeTwoFactorLogin } from "./repositories/two-factor";
-import { getActiveRoutePairs } from "./repositories/routes";
+import { getActiveRoutePairs, toRouteOptions } from "./repositories/routes";
 import { deleteTrip, getTrip, getSuggestedOdometer, getTripsForMonth, tripToDto, updateTrip } from "./repositories/trips";
 import { getRemarkSettings } from "./repositories/remarks";
 import { getReimbursementSettings, getVehicleSettings } from "./repositories/settings";
@@ -96,11 +96,15 @@ export async function handleMobileApi(request: Request, path: string[]) {
         return json({ ok: true });
       case "GET me":
         return json({ user: { id: user.id, username: user.username }, apiVersion: 1 });
-      case "GET bootstrap":
-        return json({ apiVersion: 1, routes: await getActiveRoutePairs(), vehicle: await getVehicleSettings(),
-          reimbursement: await getReimbursementSettings(), remarks: getRemarkSettings(), capabilities: { tripManagement: true } });
-      case "GET routes":
-        return json({ routes: await getActiveRoutePairs() });
+      case "GET bootstrap": {
+        const routes = await getActiveRoutePairs();
+        return json({ apiVersion: 1, routes, routeOptions: toRouteOptions(routes, params.get("q") ?? ""), vehicle: await getVehicleSettings(),
+          reimbursement: await getReimbursementSettings(), remarks: getRemarkSettings(), capabilities: { tripManagement: true, routeSearch: true } });
+      }
+      case "GET routes": {
+        const routes = await getActiveRoutePairs();
+        return json({ routes, routeOptions: toRouteOptions(routes, params.get("q") ?? "") });
+      }
       case "GET trips":
         return json(await getTripsForMonth(monthSchema.parse(params.get("month"))));
       case "GET trips/suggested-odometer": {

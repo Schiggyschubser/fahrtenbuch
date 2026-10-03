@@ -102,6 +102,8 @@ test("Bemerkungsvorlagen, Fahrttexte und CSV funktionieren auf Desktop, mobil un
   await expect(page.getByTestId("print-table-wrap")).toContainText(remark);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
   await page.setViewportSize({ width: 1440, height: 1000 });
+  await expect(page.getByTestId("print-table-wrap")).toHaveAttribute("data-ready", "true");
+  await expect(page.locator(".print-page-frame")).not.toHaveCount(1);
   await page.emulateMedia({ media: "print" });
   await expect(page.getByRole("columnheader", { name: "Bemerkungen", exact: true }).first()).toBeVisible();
   const firstRow = page.getByTestId("print-table-wrap").locator("tbody tr").first();

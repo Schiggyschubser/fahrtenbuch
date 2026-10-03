@@ -1,3 +1,31 @@
+# Version 1.0.15 · 03.10.2026
+
+- Reisewegsuche: Bei `Coii` zuerst `COII → …`, danach Treffer wie `AG → COII`; beide Gruppen alphabetisch nach deutscher Sortierung unabhängig von Groß-/Kleinschreibung. Ohne Suchtext erscheinen alle Einträge alphabetisch.
+- Eine gemeinsame Suchfunktion bestimmt die Reihenfolge in Webauswahl und API.
+- `GET /api/routes`, `GET /api/v1/routes` und `GET /api/v1/bootstrap` liefern zusätzlich `routeOptions` mit beiden Fahrtrichtungen; `q` filtert und sortiert nach dem Suchtext.
+- Bestehende `routes` bleiben vollständig und kompatibel. `bootstrap.capabilities.routeSearch` zeigt die Unterstützung an. Die Handy-App muss `routeOptions` in der gelieferten Reihenfolge anzeigen.
+- Keine Datenbankmigration oder Änderung vorhandener Fahrtwerte.
+
+## Image und Compose für 1.0.15
+
+`docker-compose.yaml` verwendet `ghcr.io/schiggyschubser/fahrtenbuch:1.0.15`.
+Der GitHub-Workflow veröffentlicht das Image für Linux AMD64 und ARM64 sowie
+das Release `v1.0.15`. Port `1357:3000`, Datenverzeichnis `./data:/app/data`,
+Netzwerke und Umgebungsvariablen bleiben unverändert.
+
+## Kurztest und Rollback für 1.0.15
+
+Vor und nach einer Compose-Änderung `docker compose config --quiet` ausführen;
+die bisherige Compose-Datei sichern und das zuvor laufende Image behalten.
+Nach einer freigegebenen Aktivierung Container-Healthcheck, Versionsanzeige
+1.0.15 und die Suche `Coii` prüfen. Die API muss ohne Token HTTP 401 liefern.
+
+Für den Rollback den bisherigen Image-Verweis in der gesicherten Compose-Datei
+verwenden, die Konfiguration validieren und nach Freigabe nur den App-Container
+mit `docker compose up -d --no-deps --pull never fahrtenbuch` neu erstellen.
+Die aktuelle Datenbank beibehalten; keine Volumes löschen und keine
+Datenrücksicherung durchführen.
+
 # Version 1.0.14 · 02.10.2026
 
 - Dashboard: Jahresauswahl verwendet die Textfarbe des jeweiligen Themes statt einer dunklen Hintergrundfarbe.

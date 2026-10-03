@@ -1,4 +1,4 @@
-# Android-Anbindung – API v1 (Server 1.0.12)
+# Android-Anbindung – API v1 (Server 1.0.15)
 
 Basis: `https://DEIN-FAHRTENBUCH-HOST/api/v1`. Die App verwendet dieselbe Serveradresse wie die Weboberfläche. Im privaten Testnetz ist der bestehende Port 1357 verwendbar. Zugangsdaten und Tokens nur über HTTPS oder eine entsprechend geschützte Verbindung übertragen. Es wird kein zusätzlicher Port benötigt.
 
@@ -21,12 +21,20 @@ Passwort-Anmeldungen sind pro Serverprozess auf 5 Versuche pro Benutzername und 
 | Anfrage | Antwort |
 | --- | --- |
 | `GET /me` | `{user:{id,username},apiVersion:1}` |
-| `GET /bootstrap` | `{apiVersion:1,routes:[…],vehicle:{licensePlate},reimbursement:{reimbursementRateCents},remarks:{templates:[{id,text}],defaultTemplateId}}` |
-| `GET /routes` | `{routes:[…]}`; nur aktive Reisewege |
+| `GET /bootstrap` | `{apiVersion:1,routes:[…],routeOptions:[…],vehicle:{licensePlate},reimbursement:{reimbursementRateCents},remarks:{templates:[{id,text}],defaultTemplateId},capabilities:{tripManagement:true,routeSearch:true}}` |
+| `GET /routes?q=Coii` | `{routes:[…],routeOptions:[…]}`; `q` ist optional; nur aktive Reisewege |
 | `GET /trips?month=2026-09` | `{trips:[…],totalKm,totalReimbursedKm,totalUnreimbursedKm,totalPotentialReimbursementCents,suggestedOdometerStart}` |
 | `GET /trips/suggested-odometer?date=2026-09-29&startTime=08:15` | `{suggestedOdometerStart:12345}`; ohne vorherige Fahrt `null`; `startTime` optional |
 
 Reiseweg: `{id,placeA,placeB,placeAFullName,placeBFullName,distanceKm,reimbursedKm,unreimbursedKm,durationMinutes}`. `id` als `routePairId` verwenden. Das Fahrtenbuch ist wie die bestehende Webanwendung gemeinsam; es gibt keine getrennten Fahrtenbestände pro App oder Benutzer.
+
+### Reisewege suchen und anzeigen
+
+`routeOptions` enthält beide Fahrtrichtungen als `{value,routePairId,direction,origin,destination,label,distanceKm,reimbursedKm,unreimbursedKm,durationMinutes}`. Die App soll diese Liste in der gelieferten Reihenfolge anzeigen. `routePairId` und `direction` direkt für eine neue Fahrt übernehmen; `value` ist die stabile Auswahlkennung (z. B. `2:B_TO_A`).
+
+Ohne `q` sind alle Optionen alphabetisch nach `label` sortiert (deutsche Sortierung, unabhängig von Groß-/Kleinschreibung). Mit `q` werden nur Reisewege mit dem Suchtext im Label geliefert, zuerst Treffer am Anfang, danach übrige Treffer; beide Gruppen sind jeweils alphabetisch. Leerzeichen am Anfang und Ende des Suchtexts werden ignoriert. Bei `q=Coii` kommt beispielsweise `COII → AG` vor `COII → Büro` und anschließend `AG → COII`. Ohne Treffer ist `routeOptions: []`.
+
+Auch `GET /bootstrap?q=Coii` und die Cookie-geschützte Web-API `GET /api/routes?q=Coii` liefern diese Suchreihenfolge. Das bisherige Feld `routes` enthält weiterhin alle aktiven Streckenpaare unabhängig von `q`, damit bestehende Clients kompatibel bleiben. `capabilities.routeSearch` im Bootstrap zeigt die Unterstützung an. Ein Client, der seine Auswahl bisher selbst aus `routes` aufbaut, muss für die serverseitige Suchreihenfolge `routeOptions` verwenden und bei einer Eingabe `q` URL-kodiert übertragen.
 
 ## Fahrt übertragen
 

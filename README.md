@@ -1,11 +1,13 @@
 # Fahrtenbuch Custom – lokale Entwicklungsbasis
 
-Version **1.0.14** ergänzt eine bearbeitbare Antragsvorlage unter **Einstellungen → Antrag**. In der Druckvorschau kann **Antrag voranstellen** gewählt werden: zwei Originalseiten im Hochformat, danach die Fahrten im Querformat. Das Unterschriftsdatum wird beim Drucken auf den aktuellen Tag in Europe/Berlin gesetzt. Das Haushaltsjahr kann mit `{{jahr}}` das Jahr des ausgewählten Fahrtenmonats übernehmen. Die Zeitraum-Auswahl ist auch in dunklen Themes lesbar.
+Version **1.0.15** sortiert die Reisewegsuche nach der Eingabe: zuerst Treffer am Anfang des Reisewegs, danach weitere Treffer, beide Gruppen alphabetisch. Die Web- und Android-API liefern dieselbe Reihenfolge über `routeOptions` und den optionalen Suchparameter `q`. Details: [ANDROID_API.md](ANDROID_API.md).
+
+Unter **Einstellungen → Antrag** lässt sich eine Antragsvorlage bearbeiten. In der Druckvorschau kann **Antrag voranstellen** gewählt werden: zwei Originalseiten im Hochformat, danach die Fahrten im Querformat. Das Unterschriftsdatum wird beim Drucken auf den aktuellen Tag in Europe/Berlin gesetzt. Das Haushaltsjahr kann mit `{{jahr}}` das Jahr des ausgewählten Fahrtenmonats übernehmen. Die Zeitraum-Auswahl ist auch in dunklen Themes lesbar.
 Eine sichtbare Unterschrift lässt sich unter **Einstellungen → Antrag** als PNG/JPG/WebP hochladen oder direkt mit Finger, Stift oder Maus zeichnen. Nach dem Speichern ist sie über **Unterschrift einfügen** in der Druckvorschau für die jeweilige Ausgabe auswählbar. Sie erscheint im Unterschriftsfeld auf Seite 1. Entfernen oder Ersetzen erfolgt in den Einstellungen; Datensicherungen enthalten auch die gespeicherte Unterschrift. Es handelt sich um ein Unterschriftsbild, keine zertifikatsbasierte PDF-Signatur.
 
-Das Image `ghcr.io/schiggyschubser/fahrtenbuch:1.0.14` wird über den GitHub-Workflow für Linux AMD64 und ARM64 veröffentlicht. Persönliche Vorlagenwerte werden in SQLite gespeichert und nicht in die öffentlich ausgelieferten Formulargrafiken eingebettet.
+Das Image `ghcr.io/schiggyschubser/fahrtenbuch:1.0.15` wird über den GitHub-Workflow für Linux AMD64 und ARM64 veröffentlicht. Persönliche Vorlagenwerte werden in SQLite gespeichert und nicht in die öffentlich ausgelieferten Formulargrafiken eingebettet.
 
-Aktuelle Erweiterungen und Updatehinweise: [Version 1.0.14](RELEASE_NOTES.md). Der produktive Compose-Stand verwendet das eigene versionierte GHCR-Image. PDF-Ausgabe erfolgt über die Druckansicht, Import und Export von Fahrtdaten erfolgen per CSV. Uhrzeiten können direkt als vier Ziffern eingegeben werden, etwa `0815` für `08:15`.
+Aktuelle Erweiterungen und Updatehinweise: [Version 1.0.15](RELEASE_NOTES.md). Der produktive Compose-Stand verwendet das eigene versionierte GHCR-Image. PDF-Ausgabe erfolgt über die Druckansicht, Import und Export von Fahrtdaten erfolgen per CSV. Uhrzeiten können direkt als vier Ziffern eingegeben werden, etwa `0815` für `08:15`.
 
 Diese Version basiert auf dem Projekt **Fahrtenbuch 1.0.4**. Die konkrete Version dieses Projektstands steht in der Datei `VERSION` und wird auch im Footer der Anwendung angezeigt. Der Ordner ist so vorbereitet, dass du ihn auf deinen Docker-Host kopieren, lokal bauen und anschließend mit fortlaufender Versionsnummer weiterentwickeln kannst.
 
@@ -59,7 +61,7 @@ Passwort: admin
 
 ## Produktives Image und Konfiguration
 
-`docker-compose.yaml` verwendet `ghcr.io/schiggyschubser/fahrtenbuch:1.0.14`.
+`docker-compose.yaml` verwendet `ghcr.io/schiggyschubser/fahrtenbuch:1.0.15`.
 Die Compose-Datei legt Port `1357:3000`, Datenverzeichnis `./data:/app/data`
 und Zeitzone `Europe/Berlin` fest. Eine `.env` ist für diese feste Konfiguration
 nicht erforderlich. Anpassungen werden direkt in der Compose-Datei vorgenommen
