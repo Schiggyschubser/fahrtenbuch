@@ -1,10 +1,57 @@
 [
   {
+    "version": "1.0.14",
+    "date": "2026-10-02",
+    "title": "Bearbeitbarer Reisekostenantrag mit optionaler Unterschrift vor dem PDF-Fahrtennachweis und lesbare Zeitraum-Auswahl",
+    "fileCount": 23,
+    "files": [
+      "components/DashboardOverviewClient.tsx",
+      "components/ClaimPages.tsx",
+      "components/ClaimTemplateSettings.tsx",
+      "components/PrintPreview.tsx",
+      "components/PrintToolbar.tsx",
+      "components/SettingsClient.tsx",
+      "app/settings/page.tsx",
+      "app/print/page.tsx",
+      "app/globals.css",
+      "app/api/settings/claim-template/route.ts",
+      "lib/claim-template.ts",
+      "lib/repositories/claim-template.ts",
+      "lib/db/schema.ts",
+      "lib/db/index.ts",
+      "lib/backups.ts",
+      "public/forms/travel-claim/page-1.svg",
+      "public/forms/travel-claim/page-2.svg",
+      "tests/claim-template.integration.test.ts",
+      "tests/e2e/claim-template.spec.ts",
+      "components/SignatureEditor.tsx",
+      "lib/signature-image.ts",
+      "tests/signature-image.test.ts",
+      "tests/e2e/signature.spec.ts"
+    ]
+  },
+  {
     "version": "1.0.13",
     "date": "2026-09-30",
     "title": "Fahrten über die Android-API bearbeiten und löschen",
     "fileCount": 15,
-    "files": ["ANDROID_API.md", "README.md", "RELEASE_NOTES.md", "VERSION", "app/api/v1/[...path]/route.ts", "docker-compose.yaml", "lib/changelog.json", "lib/mobile-api.ts", "lib/mobile-trips.ts", "lib/repositories/trips.ts", "lib/types.ts", "package-lock.json", "package.json", "tests/container-smoke.mjs", "tests/mobile-api.integration.test.ts"]
+    "files": [
+      "ANDROID_API.md",
+      "README.md",
+      "RELEASE_NOTES.md",
+      "VERSION",
+      "app/api/v1/[...path]/route.ts",
+      "docker-compose.yaml",
+      "lib/changelog.json",
+      "lib/mobile-api.ts",
+      "lib/mobile-trips.ts",
+      "lib/repositories/trips.ts",
+      "lib/types.ts",
+      "package-lock.json",
+      "package.json",
+      "tests/container-smoke.mjs",
+      "tests/mobile-api.integration.test.ts"
+    ]
   },
   {
     "version": "1.0.12",

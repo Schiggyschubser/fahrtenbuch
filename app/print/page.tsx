@@ -5,6 +5,8 @@ import { requirePageUser } from "@/lib/auth";
 import { currentMonth } from "@/lib/dates";
 import { getTripsForMonth } from "@/lib/repositories/trips";
 import { monthSchema } from "@/lib/validation";
+import { getClaimTemplate } from "@/lib/repositories/claim-template";
+import { claimOutputDate } from "@/lib/claim-template";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +33,7 @@ export default async function PrintPage({ searchParams }: PrintPageProps) {
   const data = await getTripsForMonth(month);
   const { visibleColumns } = await getPrintColumnSettings();
   const { licensePlate } = await getVehicleSettings();
+  const claimTemplate = await getClaimTemplate();
   const createdAt = new Intl.DateTimeFormat("de-DE", {
     timeZone: "Europe/Berlin",
     dateStyle: "medium",
@@ -39,7 +42,7 @@ export default async function PrintPage({ searchParams }: PrintPageProps) {
 
   return (
     <main className="print-shell">
-      <PrintPreview data={data} visibleColumns={visibleColumns} title={monthTitle(month)} createdAt={createdAt} licensePlate={licensePlate} />
+      <PrintPreview data={data} visibleColumns={visibleColumns} title={monthTitle(month)} createdAt={createdAt} licensePlate={licensePlate} claimTemplate={claimTemplate} claimMonth={month} outputDate={claimOutputDate()} />
     </main>
   );
 }

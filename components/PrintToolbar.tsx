@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { ALL_TRIP_COLUMN_IDS, TRIP_COLUMNS, type TripColumnId } from "@/lib/trip-columns";
 
-export function PrintToolbar({ initialVisibleColumns, preparing = false }: { initialVisibleColumns: TripColumnId[]; preparing?: boolean }) {
+export function PrintToolbar({ initialVisibleColumns, preparing = false, includeClaim, onIncludeClaim, signatureAvailable, includeSignature, onIncludeSignature }: { initialVisibleColumns: TripColumnId[]; preparing?: boolean; includeClaim: boolean; onIncludeClaim: (include: boolean) => void; signatureAvailable: boolean; includeSignature: boolean; onIncludeSignature: (include: boolean) => void }) {
   const router = useRouter();
   const [visibleColumns, setVisibleColumns] = useState(initialVisibleColumns);
   const [open, setOpen] = useState(false);
@@ -43,9 +43,11 @@ export function PrintToolbar({ initialVisibleColumns, preparing = false }: { ini
     finally { setSaving(false); }
   }
   return (
-    <div className="print-toolbar page-enter sticky top-0 z-10 mx-auto mb-4 flex w-full max-w-[297mm] flex-col gap-3 rounded-2xl border border-[var(--line)] bg-[var(--surface-translucent)] px-3 py-3 shadow-[0_8px_28px_rgba(15,23,42,.10)] backdrop-blur sm:mb-5 sm:flex-row sm:items-center sm:justify-between sm:px-4">
+    <div className="print-toolbar page-enter sticky top-0 z-10 mx-auto mb-4 flex w-full max-w-[297mm] flex-col gap-3 rounded-2xl border border-[var(--line)] bg-[var(--surface-translucent)] px-3 py-3 shadow-[0_8px_28px_rgba(15,23,42,.10)] backdrop-blur sm:mb-5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-4">
       <Link href="/trips" className="btn-secondary focus-ring w-full sm:w-auto"><FontAwesomeIcon icon={faArrowLeft} className="h-[18px] w-[18px]" /> Zurück zum Fahrtenbuch</Link>
-      <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-3">
+      <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
+        <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold"><input type="checkbox" className="h-4 w-4 accent-[var(--primary)]" checked={includeClaim} onChange={event => onIncludeClaim(event.target.checked)} />Antrag voranstellen</label>
+        {signatureAvailable ? <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold"><input type="checkbox" className="h-4 w-4 accent-[var(--primary)]" checked={includeSignature} disabled={!includeClaim} onChange={event => onIncludeSignature(event.target.checked)} />Unterschrift einfügen</label> : null}
         <div ref={dropdownRef} className="relative" onKeyDown={(event) => { if (event.key === "Escape") { setOpen(false); buttonRef.current?.focus(); } }}>
           <button ref={buttonRef} type="button" className="btn-secondary focus-ring w-full sm:w-auto" aria-expanded={open} aria-controls="print-columns-dropdown" onClick={() => setOpen(!open)}>
             Spalten für PDF/Druck <FontAwesomeIcon icon={faChevronDown} className={`h-3 w-3 transition-transform ${open ? "rotate-180" : ""}`} />

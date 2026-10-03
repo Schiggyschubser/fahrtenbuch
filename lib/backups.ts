@@ -1,4 +1,5 @@
 import { decodeTripColumns } from "./trip-columns";
+import { decodeClaimTemplate } from "./claim-template";
 import fs from "node:fs";
 import path from "node:path";
 import Database from "better-sqlite3";
@@ -141,6 +142,10 @@ export function restoreBackup(id: string) {
     const restoredLicensePlate = hasLicensePlate
       ? (backupColumns.prepare("SELECT license_plate AS value FROM app_settings WHERE id = 1").get() as { value: string } | undefined)?.value ?? ""
       : "";
+    const hasClaimTemplate = backupTables.has("app_settings")
+      && (backupColumns.pragma("table_info(app_settings)") as Array<{ name: string }>).some(column => column.name === "claim_template");
+    const restoredClaimTemplate = decodeClaimTemplate(hasClaimTemplate
+      ? (backupColumns.prepare("SELECT claim_template AS value FROM app_settings WHERE id = 1").get() as { value: string | null } | undefined)?.value : null);
     const textColumns = ["origin_full_name_snapshot", "destination_full_name_snapshot", "accompanying_staff", "remark"];
     backupColumns.close();
     sqlite.prepare("ATTACH DATABASE ? AS restore_db").run(sourcePath);
@@ -184,6 +189,7 @@ export function restoreBackup(id: string) {
         sqlite.prepare("UPDATE app_settings SET print_columns = ? WHERE id = 1")
           .run(JSON.stringify(decodeTripColumns(restoredPrintColumns)));
         sqlite.prepare("UPDATE app_settings SET license_plate = ? WHERE id = 1").run(restoredLicensePlate);
+        sqlite.prepare("UPDATE app_settings SET claim_template = ? WHERE id = 1").run(JSON.stringify(restoredClaimTemplate));
         const foreignKeyErrors = sqlite.pragma("foreign_key_check") as unknown[];
         if (foreignKeyErrors.length > 0) throw new Error("Die wiederhergestellten Daten enthalten ungültige Verknüpfungen.");
       });

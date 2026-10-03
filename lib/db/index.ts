@@ -182,6 +182,9 @@ export function ensureDatabaseReady() {
   }
   state.sqlite.exec("CREATE TABLE IF NOT EXISTS remark_templates (id INTEGER PRIMARY KEY AUTOINCREMENT, text TEXT NOT NULL)");
   const settingColumns = state.sqlite.pragma("table_info(app_settings)") as Array<{ name: string }>;
+  if (!settingColumns.some((column) => column.name === "claim_template")) {
+    state.sqlite.exec("ALTER TABLE app_settings ADD COLUMN claim_template TEXT");
+  }
   if (!settingColumns.some((column) => column.name === "license_plate")) {
     state.sqlite.exec("ALTER TABLE app_settings ADD COLUMN license_plate TEXT NOT NULL DEFAULT ''");
   }

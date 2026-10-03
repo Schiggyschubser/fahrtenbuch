@@ -35,11 +35,14 @@ import { ThemeSelector } from "./ThemeSelector";
 
 import { RemarkSettingsCard } from "./RemarkSettingsCard";
 import { VehicleSettingsCard } from "./VehicleSettingsCard";
+import { ClaimTemplateSettings } from "./ClaimTemplateSettings";
+import type { ClaimTemplate } from "@/lib/claim-template";
 import type { RemarkSettingsDto } from "@/lib/types";
 
-export type SettingsTab = "appearance" | "remarks" | "routes" | "reimbursement" | "backups" | "transfer" | "credentials";
+export type SettingsTab = "appearance" | "remarks" | "routes" | "reimbursement" | "claim" | "backups" | "transfer" | "credentials";
 
-export function SettingsClient({ initialVehicleSettings, initialRemarkSettings, initialRoutes, initialBackups, initialReimbursementSettings, initialTwoFactorStatus, initialTripDateRange, initialTab, username }: {
+export function SettingsClient({ initialClaimTemplate, initialVehicleSettings, initialRemarkSettings, initialRoutes, initialBackups, initialReimbursementSettings, initialTwoFactorStatus, initialTripDateRange, initialTab, username }: {
+  initialClaimTemplate: ClaimTemplate;
   initialVehicleSettings: { licensePlate: string };
   initialRemarkSettings: RemarkSettingsDto;
   initialRoutes: RoutePairDto[];
@@ -51,6 +54,7 @@ export function SettingsClient({ initialVehicleSettings, initialRemarkSettings, 
   username: string;
 }) {
   const [remarkSettings, setRemarkSettings] = useState(initialRemarkSettings);
+  const [claimTemplate, setClaimTemplate] = useState(initialClaimTemplate);
   const [vehicleSettings, setVehicleSettings] = useState(initialVehicleSettings);
   const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab);
   const [routes, setRoutes] = useState(initialRoutes);
@@ -70,6 +74,8 @@ export function SettingsClient({ initialVehicleSettings, initialRemarkSettings, 
   }
 
   async function reloadAllData() {
+    const claimResponse = await fetch("/api/settings/claim-template");
+    if (claimResponse.ok) setClaimTemplate(await claimResponse.json());
     const vehicleResponse = await fetch("/api/settings/vehicle");
     if (vehicleResponse.ok) setVehicleSettings(await vehicleResponse.json());
     const [routesResponse, backupsResponse, reimbursementResponse, remarksResponse] = await Promise.all([
@@ -92,12 +98,13 @@ export function SettingsClient({ initialVehicleSettings, initialRemarkSettings, 
 
   return (
     <div>
-      <div role="tablist" aria-label="Einstellungsbereiche" className="section-enter mb-5 flex gap-2 overflow-x-auto rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-2 shadow-[var(--card-shadow)] md:mb-6 md:grid md:grid-cols-3 md:overflow-visible xl:grid-cols-7">
+      <div role="tablist" aria-label="Einstellungsbereiche" className="section-enter mb-5 flex gap-2 overflow-x-auto rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-2 shadow-[var(--card-shadow)] md:mb-6 md:grid md:grid-cols-4 md:overflow-visible">
         <SettingsTabButton active={activeTab === "appearance"} icon="appearance" title="Darstellung" description={`${THEMES.length} helle und dunkle Themes`} onClick={() => selectTab("appearance")} />
         <SettingsTabButton active={activeTab === "remarks"} icon="remarks" title="Bemerkungen" description="Vorlagen und Standardtext" onClick={() => selectTab("remarks")} />
         <SettingsTabButton active={activeTab === "routes"} icon="routes" title="Reisewege" description={`${routes.length} gespeicherte Strecken`} onClick={() => selectTab("routes")} />
         <SettingsTabButton active={activeTab === "reimbursement"} icon="reimbursement" title="Abrechnung" description={`${(reimbursementSettings.reimbursementRateCents / 100).toLocaleString("de-DE", { minimumFractionDigits: 2 })} € pro km`} onClick={() => selectTab("reimbursement")} />
         <SettingsTabButton active={activeTab === "backups"} icon="backups" title="Sicherungen" description={`${backups.length} Backups vorhanden`} onClick={() => selectTab("backups")} />
+        <SettingsTabButton active={activeTab === "claim"} icon="claim" title="Antrag" description="Vorlage für PDF und Druck" onClick={() => selectTab("claim")} />
         <SettingsTabButton active={activeTab === "transfer"} icon="transfer" title="Import / Export" description="Fahrten als CSV" onClick={() => selectTab("transfer")} />
         <SettingsTabButton active={activeTab === "credentials"} icon="credentials" title="Zugang" description="Benutzername und Passwort" onClick={() => selectTab("credentials")} />
       </div>
@@ -105,6 +112,7 @@ export function SettingsClient({ initialVehicleSettings, initialRemarkSettings, 
       <div key={activeTab} role="tabpanel" className="section-enter">
         {activeTab === "appearance" ? <ThemeSelector /> : null}
         {activeTab === "remarks" ? <RemarkSettingsCard settings={remarkSettings} onSaved={setRemarkSettings} /> : null}
+        {activeTab === "claim" ? <ClaimTemplateSettings initialTemplate={claimTemplate} onSaved={setClaimTemplate} /> : null}
         {activeTab === "routes" ? (
           <><VehicleSettingsCard settings={vehicleSettings} onSaved={setVehicleSettings} />
           <RoutesCard routes={routes} onCreate={() => setRouteModal({ key: `new-${Date.now()}` })} onEdit={(route) => setRouteModal({ key: `edit-${route.id}`, route })} /></>
@@ -124,6 +132,7 @@ export function SettingsClient({ initialVehicleSettings, initialRemarkSettings, 
 
 function SettingsTabIcon({ type }: { type: SettingsTab }) {
   const icons: Record<SettingsTab, IconDefinition> = {
+    claim: faReceipt,
     remarks: faClipboard,
     appearance: faPalette,
     routes: faRoute,

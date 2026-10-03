@@ -1,3 +1,30 @@
+# Version 1.0.14 · 02.10.2026
+
+- Dashboard: Jahresauswahl verwendet die Textfarbe des jeweiligen Themes statt einer dunklen Hintergrundfarbe.
+- Einstellungen → Antrag: bearbeitbare Formularfelder für den zweitseitigen Reisekostenantrag, Vorschau und wählbare Voreinstellung für den PDF-Export.
+- Druckvorschau: optional beide Originalseiten im Hochformat vor den Fahrten im Querformat; Fahrtenseiten berücksichtigen die beiden Antragsseiten in ihrer Seitennummerierung.
+- Unterschriftsdatum: aktueller Ausgabetag in Europe/Berlin, auch bei über Mitternacht geöffneter Vorschau. Haushaltsjahr unabhängig davon über `{{jahr}}` oder frei eingetragen.
+- Unterschrift: unter Einstellungen → Antrag als PNG/JPG/WebP hochladen oder mit Finger, Stift oder Maus zeichnen. In der Druckvorschau optional über „Unterschrift einfügen“ auf Seite 1 einsetzen. Gespeicherte Unterschriften sind austauschbar, entfernbar und Teil der Datensicherung. Die Funktion fügt ein sichtbares Unterschriftsbild ein; sie erzeugt keine Zertifikatssignatur.
+- Neue nullable Spalte `app_settings.claim_template`; vorhandene Fahrten und Einstellungen bleiben erhalten. Sicherung/Wiederherstellung berücksichtigt die Vorlage; ältere Sicherungen ergeben eine leere Vorlage.
+- Öffentliche Formulargrafiken enthalten keine persönlichen Vorgaben. Persönliche Daten werden separat in die Datenbank übernommen.
+- Vor Aktivierung konsistente Datenbanksicherung erstellen und bisheriges Image für die Rückkehr bereithalten.
+
+## Image und Compose für 1.0.14
+
+Das Image `ghcr.io/schiggyschubser/fahrtenbuch:1.0.14` wird über GitHub Actions
+für Linux AMD64 und ARM64 veröffentlicht. `docker-compose.yaml` verwendet diesen
+versionierten Tag. Bei der Umstellung vom lokalen Image 1.0.14 ändert sich nur
+der Image-Verweis; Port 1357, Datenverzeichnis und übrige Konfiguration bleiben gleich.
+
+Kurztest: `docker compose config --quiet`, `docker compose config --images` und
+den Container-Healthcheck prüfen. Nach einer separat freigegebenen Aktivierung
+muss `/login` Version 1.0.14 anzeigen; `/api/v1/me` ohne Token liefert HTTP 401.
+
+Rollback der Compose-Umstellung: gesicherte Compose-Datei wiederherstellen und
+mit `docker compose config --quiet` prüfen. Ohne Container-Update ist kein Neustart
+nötig. Nach einer Aktivierung das erhaltene lokale Image 1.0.14 verwenden;
+Produktionsdaten beibehalten und keine Volumes löschen.
+
 # Version 1.0.13 · 30.09.2026
 
 - Android-API: `GET /api/v1/trips/:id`, `PUT /api/v1/trips/:id` und `DELETE /api/v1/trips/:id`.

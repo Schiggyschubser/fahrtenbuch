@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { randomUUID } from "node:crypto";
+import sharp from "sharp";
 
 assert.equal(process.env.DATABASE_PATH, "/tmp/mobile-smoke/fahrtenbuch.db");
 let server;
@@ -12,7 +13,7 @@ async function start() {
   for (let i = 0; i < 100; i++) {
     try {
       const response = await fetch(`${base}/login`);
-      if (response.ok) { assert.match(await response.text(), /1\.0\.13/); return; }
+      if (response.ok) { assert.match(await response.text(), /1\.0\.14/); return; }
     } catch { /* startup */ }
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
@@ -35,6 +36,26 @@ try {
   const webLogin = await post("/api/auth/login", credentials);
   assert.equal(webLogin.status, 200);
   const Cookie = webLogin.headers.get("set-cookie").split(";")[0];
+  assert.equal((await fetch(`${base}/api/settings/claim-template`)).status, 401);
+  const claimUrl = `${base}/api/settings/claim-template`;
+  const initialClaim = await (await fetch(claimUrl, { headers: { Cookie } })).json();
+  assert.equal(initialClaim.signature, null);
+  const signatureImage = await sharp({ create: { width: 150, height: 30, channels: 4, background: "navy" } }).png().toBuffer();
+  const claim = { ...initialClaim, includeByDefault: true,
+    fields: { ...initialClaim.fields, recipient: "Smoke Test", signaturePlace: "Testort" },
+    signature: `data:image/png;base64,${signatureImage.toString("base64")}` };
+  const patchClaim = body => fetch(claimUrl, { method: "PATCH", headers: { Cookie, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const savedClaimResponse = await patchClaim(claim);
+  assert.equal(savedClaimResponse.status, 200);
+  const savedClaim = await savedClaimResponse.json();
+  assert.match(savedClaim.signature, /^data:image\/png;base64,/);
+  assert.equal((await patchClaim({ ...claim, signature: "data:image/png;base64,YmFk" })).status, 400);
+  assert.deepEqual(await (await fetch(claimUrl, { headers: { Cookie } })).json(), savedClaim);
+  for (const page of [1, 2]) {
+    const form = await fetch(`${base}/forms/travel-claim/page-${page}.svg`);
+    assert.equal(form.status, 200);
+    assert.match(await form.text(), /<svg/);
+  }
   const routeResponse = await post("/api/routes", { placeA: "Smoke A", placeB: "Smoke B", distanceKm: 20, reimbursedKm: 15, durationMinutes: 30 }, { Cookie });
   assert.equal(routeResponse.status, 201);
   const route = (await routeResponse.json()).route;
@@ -50,6 +71,9 @@ try {
   assert.equal(saved.trip.odometerEnd, 1020);
   await stop();
   await start();
+  assert.deepEqual(await (await fetch(claimUrl, { headers: { Cookie } })).json(), savedClaim);
+  assert.equal((await patchClaim({ ...savedClaim, signature: null })).status, 200);
+  assert.equal((await (await fetch(claimUrl, { headers: { Cookie } })).json()).signature, null);
   const repeated = await post("/api/v1/trips", input, { Authorization });
   assert.equal(repeated.status, 200);
   assert.deepEqual(await repeated.json(), { ...saved, duplicate: true });
@@ -61,7 +85,7 @@ try {
     method, headers: { Authorization, "Content-Type": "application/json" }, body: JSON.stringify(body),
   });
   const changed = await mutation("PUT", { expectedUpdatedAt: saved.trip.updatedAt, date: input.date,
-    startTime: input.startTime, endTime: input.endTime, odometerStart: 1100, remark: "Im Container geändert" });
+    startTime: input.startTime, endTime: input.endTime, odometerStart: 1100, remark: "Im Container geÃ¤ndert" });
   assert.equal(changed.status, 200);
   const updated = (await changed.json()).trip;
   assert.equal(updated.odometerStart, 1100);
@@ -72,5 +96,5 @@ try {
   assert.equal((await (await fetch(`${base}/api/trips?month=2026-09`, { headers: { Cookie } })).json()).trips.length, 0);
   assert.equal((await post("/api/v1/auth/logout", {}, { Authorization })).status, 200);
   assert.equal((await fetch(`${base}/api/v1/me`, { headers: { Authorization } })).status, 401);
-  console.log("Container smoke passed: web/mobile login, trip, restart/retry persistence, web visibility, edit/delete with revision checks, immutable receipt, logout.");
+  console.log("Container smoke passed: web/mobile login, trip, restart/retry persistence, web visibility, edit/delete with revision checks, immutable receipt, logout, claim template and signature validation/persistence/removal, both form pages.");
 } finally { await stop(); }

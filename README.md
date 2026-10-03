@@ -1,9 +1,11 @@
 # Fahrtenbuch Custom – lokale Entwicklungsbasis
 
-Version **1.0.13**: [Android-API v1](ANDROID_API.md) mit Bearer-Anmeldung, idempotenter Übernahme sowie Bearbeiten und Löschen von Fahrten mit Prüfung des zuletzt geladenen Fahrtstands.
-Versioniertes Image: `ghcr.io/schiggyschubser/fahrtenbuch:1.0.13` für Linux AMD64 und ARM64.
+Version **1.0.14** ergänzt eine bearbeitbare Antragsvorlage unter **Einstellungen → Antrag**. In der Druckvorschau kann **Antrag voranstellen** gewählt werden: zwei Originalseiten im Hochformat, danach die Fahrten im Querformat. Das Unterschriftsdatum wird beim Drucken auf den aktuellen Tag in Europe/Berlin gesetzt. Das Haushaltsjahr kann mit `{{jahr}}` das Jahr des ausgewählten Fahrtenmonats übernehmen. Die Zeitraum-Auswahl ist auch in dunklen Themes lesbar.
+Eine sichtbare Unterschrift lässt sich unter **Einstellungen → Antrag** als PNG/JPG/WebP hochladen oder direkt mit Finger, Stift oder Maus zeichnen. Nach dem Speichern ist sie über **Unterschrift einfügen** in der Druckvorschau für die jeweilige Ausgabe auswählbar. Sie erscheint im Unterschriftsfeld auf Seite 1. Entfernen oder Ersetzen erfolgt in den Einstellungen; Datensicherungen enthalten auch die gespeicherte Unterschrift. Es handelt sich um ein Unterschriftsbild, keine zertifikatsbasierte PDF-Signatur.
 
-Aktuelle Erweiterungen und Updatehinweise: [Version 1.0.13](RELEASE_NOTES.md). Der produktive Compose-Stand verwendet das eigene versionierte GHCR-Image. PDF-Ausgabe erfolgt über die Druckansicht, Import und Export von Fahrtdaten erfolgen per CSV. Uhrzeiten können direkt als vier Ziffern eingegeben werden, etwa `0815` für `08:15`.
+Das Image `ghcr.io/schiggyschubser/fahrtenbuch:1.0.14` wird über den GitHub-Workflow für Linux AMD64 und ARM64 veröffentlicht. Persönliche Vorlagenwerte werden in SQLite gespeichert und nicht in die öffentlich ausgelieferten Formulargrafiken eingebettet.
+
+Aktuelle Erweiterungen und Updatehinweise: [Version 1.0.14](RELEASE_NOTES.md). Der produktive Compose-Stand verwendet das eigene versionierte GHCR-Image. PDF-Ausgabe erfolgt über die Druckansicht, Import und Export von Fahrtdaten erfolgen per CSV. Uhrzeiten können direkt als vier Ziffern eingegeben werden, etwa `0815` für `08:15`.
 
 Diese Version basiert auf dem Projekt **Fahrtenbuch 1.0.4**. Die konkrete Version dieses Projektstands steht in der Datei `VERSION` und wird auch im Footer der Anwendung angezeigt. Der Ordner ist so vorbereitet, dass du ihn auf deinen Docker-Host kopieren, lokal bauen und anschließend mit fortlaufender Versionsnummer weiterentwickeln kannst.
 
@@ -55,46 +57,24 @@ Passwort: admin
 
 Ändere die Zugangsdaten unmittelbar nach dem ersten Login.
 
-## Was gegenüber der ursprünglichen Compose-Datei geändert wurde
+## Produktives Image und Konfiguration
 
-Die produktive `docker-compose.yaml` verwendet kein fremdes Fertig-Image mehr als Quelle, sondern baut das Image aus den Dateien in diesem Ordner:
+`docker-compose.yaml` verwendet `ghcr.io/schiggyschubser/fahrtenbuch:1.0.14`.
+Die Compose-Datei legt Port `1357:3000`, Datenverzeichnis `./data:/app/data`
+und Zeitzone `Europe/Berlin` fest. Eine `.env` ist für diese feste Konfiguration
+nicht erforderlich. Anpassungen werden direkt in der Compose-Datei vorgenommen
+und mit `docker compose config --quiet` geprüft.
 
-```yaml
-build:
-  context: .
-  dockerfile: Dockerfile
-```
-
-Damit werden deine Änderungen beim nächsten Build tatsächlich übernommen:
+Für einen neuen Server oder ein ausdrücklich freigegebenes Container-Update:
 
 ```bash
-docker compose up -d --build
+docker compose config --quiet
+docker compose pull fahrtenbuch
+docker compose up -d --no-build fahrtenbuch
 ```
 
-## Konfiguration
-
-Kopiere `.env.example` nach `.env`. Wichtige Werte:
-
-```dotenv
-APP_PORT=1357
-BIND_ADDRESS=0.0.0.0
-DATA_DIR=./data
-IMAGE_NAME=fahrtenbuch-local
-IMAGE_TAG=latest
-TZ=Europe/Berlin
-```
-
-Für einen anderen Port beispielsweise:
-
-```dotenv
-APP_PORT=4534
-```
-
-Danach:
-
-```bash
-docker compose up -d
-```
+Vor einem Update die Datenbank konsistent sichern und das vorherige Image behalten.
+Tests und Rollback sind in [RELEASE_NOTES.md](RELEASE_NOTES.md) beschrieben.
 
 ## Darstellung und Themes
 
@@ -278,7 +258,7 @@ public/              Bilder und statische Dateien
 tests/               Unit-, Integrations- und E2E-Tests
 Dockerfile           produktives Image
 Dockerfile.dev       Entwicklungsimage
-docker-compose.yaml  produktiver lokaler Build
+docker-compose.yaml  produktives GHCR-Image
 docker-compose.dev.yaml Entwicklungsserver
 ```
 
