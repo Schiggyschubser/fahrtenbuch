@@ -25,10 +25,10 @@ export function ClaimTemplateSettings({ initialTemplate, onSaved }: { initialTem
   }
   return <section className="rounded-[20px] border border-[var(--line)] bg-[var(--surface)] p-5 sm:p-6">
     <h2 className="text-lg font-extrabold">Reisekostenantrag</h2>
-    <p className="mt-2 text-sm text-[var(--muted)]">Bearbeite die Angaben für das zweitseitige Originalformular. Beim PDF-Export kannst du den Antrag vor die Fahrtenliste setzen. Das Datum bei deiner Unterschrift ist automatisch der Tag der Ausgabe.</p>
+    <p className="mt-2 text-sm text-[var(--muted)]">Bearbeite die Angaben für das zweitseitige Originalformular. Antrag und Fahrtentabellen werden in der Druckansicht getrennt als PDF oder Druckauftrag ausgegeben. Das Datum bei deiner Unterschrift ist automatisch der Tag der Ausgabe.</p>
     <form className="mt-5 space-y-5" onSubmit={event => { event.preventDefault(); void save(); }}>
       <fieldset disabled={saving} className="space-y-5">
-        <label className="flex items-center gap-3"><input type="checkbox" checked={template.includeByDefault} onChange={e => setTemplate({ ...template, includeByDefault: e.target.checked })} />Antrag beim PDF-Export vorauswählen</label>
+        <label className="flex items-center gap-3"><input type="checkbox" checked={template.includeByDefault} onChange={e => setTemplate({ ...template, includeByDefault: e.target.checked })} />Antrag in der Druckansicht vorauswählen</label>
         <div className="grid gap-4 sm:grid-cols-2">
           {CLAIM_FIELDS.map(field => <label key={field.id} className="block text-sm font-semibold">{field.label}
             <input className="focus-ring mt-1 block w-full rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-[var(--ink)]" value={template.fields[field.id]} maxLength={field.max} onChange={e => setTemplate({ ...template, fields: { ...template.fields, [field.id]: e.target.value } })} />

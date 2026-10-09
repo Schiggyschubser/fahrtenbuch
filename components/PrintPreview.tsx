@@ -7,7 +7,7 @@ import { ClaimPages } from "./ClaimPages";
 import { claimOutputDate, type ClaimTemplate } from "@/lib/claim-template";
 import type { MonthDataDto, TripDto } from "@/lib/types";
 import type { TripColumnId } from "@/lib/trip-columns";
-import { PrintToolbar } from "./PrintToolbar";
+import { PrintToolbar, type PrintOutput } from "./PrintToolbar";
 import { TripTable } from "./TripData";
 
 type Props = { data: MonthDataDto; visibleColumns: TripColumnId[]; title: string; createdAt: string; licensePlate: string; claimTemplate: ClaimTemplate; claimMonth: string; outputDate: string };
@@ -51,7 +51,7 @@ function splitTrip(trip: TripDto): TripDto[] {
 
 export function PrintPreview(props: Props) {
   const { data, visibleColumns, title } = props;
-  const [includeClaim, setIncludeClaim] = useState(props.claimTemplate.includeByDefault);
+  const [output, setOutput] = useState<PrintOutput>(props.claimTemplate.includeByDefault ? "claim" : "trips");
   const [includeSignature, setIncludeSignature] = useState(false);
   const [outputDate, setOutputDate] = useState(props.outputDate);
   useEffect(() => {
@@ -114,18 +114,17 @@ export function PrintPreview(props: Props) {
   }, [inputKey, measuredTrips]);
 
   return <>
-    <PrintToolbar initialVisibleColumns={visibleColumns} preparing={!ready} includeClaim={includeClaim} onIncludeClaim={setIncludeClaim} signatureAvailable={Boolean(props.claimTemplate.signature)} includeSignature={includeSignature} onIncludeSignature={setIncludeSignature} />
+    <PrintToolbar initialVisibleColumns={visibleColumns} preparing={!ready} output={output} onOutput={setOutput} signatureAvailable={Boolean(props.claimTemplate.signature)} includeSignature={includeSignature} onIncludeSignature={setIncludeSignature} />
     <div ref={measureRef} className="print-measure print-sheet" aria-hidden="true" inert>
       <div className="print-page-content"><DocumentHeader {...props} /><TripTable data={{ ...data, trips: measuredTrips }} visibleColumns={visibleColumns} print /><DocumentFooter title={title} page={1} count={1} /></div>
     </div>
     <div ref={pagesRef} className="print-pages" data-testid="print-table-wrap" data-ready={ready} aria-busy={!ready}>
-      {includeClaim ? <ClaimPages template={props.claimTemplate} month={props.claimMonth} outputDate={outputDate} showSignature={includeSignature} /> : null}
-      {pages.map((trips, index) => <div key={index} className="print-page-frame">
-        <article className="print-sheet text-[#172033]" aria-label={`A4 Querformat – Seite ${index + 1 + (includeClaim ? 2 : 0)} von ${pages.length + (includeClaim ? 2 : 0)}`}>
+      {output === "claim" ? <ClaimPages template={props.claimTemplate} month={props.claimMonth} outputDate={outputDate} showSignature={includeSignature} /> : pages.map((trips, index) => <div key={index} className="print-page-frame">
+        <article className="print-sheet text-[#172033]" aria-label={`A4 Querformat – Seite ${index + 1} von ${pages.length}`}>
           <div className="print-page-content">
             <DocumentHeader {...props} />
             <TripTable data={{ ...data, trips }} visibleColumns={visibleColumns} print showTotals={index === pages.length - 1} />
-            <DocumentFooter title={title} page={index + 1 + (includeClaim ? 2 : 0)} count={pages.length + (includeClaim ? 2 : 0)} />
+            <DocumentFooter title={title} page={index + 1} count={pages.length} />
           </div>
         </article>
       </div>)}

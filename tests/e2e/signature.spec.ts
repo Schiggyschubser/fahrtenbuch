@@ -24,7 +24,7 @@ test("Unterschrift zeichnen, hochladen, speichern und optional im Antrag drucken
   await page.mouse.up();
   await page.getByRole("button", { name: "Zeichnung übernehmen" }).click();
   await expect(page.getByRole("img", { name: "Vorschau deiner Unterschrift" })).toBeVisible();
-  await page.getByLabel("Antrag beim PDF-Export vorauswählen", { exact: true }).check();
+  await page.getByLabel("Antrag in der Druckansicht vorauswählen", { exact: true }).check();
   await page.getByRole("button", { name: "Antragsvorlage speichern" }).click();
   await expect(page.getByRole("status")).toHaveText("Die Antragsvorlage wurde gespeichert.");
   await page.reload();
@@ -44,10 +44,11 @@ test("Unterschrift zeichnen, hochladen, speichern und optional im Antrag drucken
   await page.getByLabel("Unterschrift einfügen", { exact: true }).uncheck();
   await expect(page.getByTestId("claim-signature")).toHaveCount(0);
   await page.getByLabel("Unterschrift einfügen", { exact: true }).check();
-  await page.getByLabel("Antrag voranstellen", { exact: true }).uncheck();
+  await page.getByLabel("Ausgabe für PDF und Druck", { exact: true }).selectOption("trips");
   await expect(page.getByTestId("claim-signature")).toHaveCount(0);
   await expect(page.getByLabel("Unterschrift einfügen", { exact: true })).toBeDisabled();
-  await page.getByLabel("Antrag voranstellen", { exact: true }).check();
+  await page.getByLabel("Ausgabe für PDF und Druck", { exact: true }).selectOption("claim");
+  await expect(page.getByTestId("claim-signature")).toHaveCount(1);
   for (const width of [375, 768, 1280]) {
     await page.setViewportSize({ width, height: 900 });
     const toolbar = page.locator(".print-toolbar");

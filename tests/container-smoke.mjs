@@ -55,6 +55,18 @@ try {
   assert.match(savedClaim.signature, /^data:image\/png;base64,/);
   assert.equal((await patchClaim({ ...claim, signature: "data:image/png;base64,YmFk" })).status, 400);
   assert.deepEqual(await (await fetch(claimUrl, { headers: { Cookie } })).json(), savedClaim);
+  const printHtml = async () => (await fetch(`${base}/print?month=2026-09`, { headers: { Cookie } })).text();
+  const claimHtml = await printHtml();
+  assert.match(claimHtml, /id="print-output"/);
+  assert.match(claimHtml, /Antrag drucken \/ PDF/);
+  assert.equal((claimHtml.match(/<article class="claim-page-frame"/g) ?? []).length, 2);
+  assert.equal((claimHtml.match(/<article class="print-sheet /g) ?? []).length, 0);
+  assert.equal((await patchClaim({ ...savedClaim, includeByDefault: false })).status, 200);
+  const tripsHtml = await printHtml();
+  assert.match(tripsHtml, /Fahrtentabellen drucken \/ PDF/);
+  assert.equal((tripsHtml.match(/<article class="claim-page-frame"/g) ?? []).length, 0);
+  assert.equal((tripsHtml.match(/<article class="print-sheet /g) ?? []).length, 1);
+  assert.equal((await patchClaim(savedClaim)).status, 200);
   for (const page of [1, 2]) {
     const form = await fetch(`${base}/forms/travel-claim/page-${page}.svg`);
     assert.equal(form.status, 200);
@@ -112,5 +124,5 @@ try {
   }
   assert.equal((await post("/api/v1/auth/logout", {}, { Authorization })).status, 200);
   assert.equal((await fetch(`${base}/api/v1/me`, { headers: { Authorization } })).status, 401);
-  console.log("Container smoke passed: web/mobile login, trip, restart/retry persistence, web visibility, edit/delete with revision checks, immutable receipt, logout, claim template and signature validation/persistence/removal, both form pages, route search order through web/mobile APIs and bootstrap.");
+  console.log("Container smoke passed: separate claim/trip print outputs, web/mobile login, trip, restart/retry persistence, web visibility, edit/delete with revision checks, immutable receipt, logout, claim template and signature validation/persistence/removal, both form pages, route search order through web/mobile APIs and bootstrap.");
 } finally { await stop(); }

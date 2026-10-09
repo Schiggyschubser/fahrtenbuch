@@ -1,5 +1,29 @@
 [
   {
+    "version": "1.0.16",
+    "date": "2026-10-09",
+    "title": "Getrennte Druckausgaben für Antrag und Fahrtentabellen; Sicherheitsupdates für Bildverarbeitung und Source Maps",
+    "fileCount": 16,
+    "files": [
+      "PRINT_OUTPUT_CHANGE.md",
+      "README.md",
+      "RELEASE_NOTES.md",
+      "SECURITY_DEPENDENCY_UPDATE.md",
+      "VERSION",
+      "app/globals.css",
+      "components/ClaimTemplateSettings.tsx",
+      "components/PrintPreview.tsx",
+      "components/PrintToolbar.tsx",
+      "docker-compose.yaml",
+      "lib/changelog.json",
+      "package-lock.json",
+      "package.json",
+      "tests/container-smoke.mjs",
+      "tests/e2e/claim-template.spec.ts",
+      "tests/e2e/signature.spec.ts"
+    ]
+  },
+  {
     "version": "1.0.15",
     "date": "2026-10-03",
     "title": "Reisewegsuche alphabetisch mit Vorrang für den Suchanfang; gemeinsame Reihenfolge in Web und Android-API",

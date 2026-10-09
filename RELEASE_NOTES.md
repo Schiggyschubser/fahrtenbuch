@@ -1,3 +1,45 @@
+# Version 1.0.16 · 09.10.2026
+
+- Druckansicht: unter **Ausgabe für PDF und Druck** entweder **Antrag · Hochformat** oder **Fahrtentabellen · Querformat** auswählen. Vorschau, PDF und Druck enthalten nur den gewählten Teil, auch beim Browser-Druckbefehl.
+- Antrag und Fahrtentabellen werden als zwei getrennte PDFs beziehungsweise Druckaufträge ausgegeben. Für beidseitigen Druck mit seitlichem Umblättern den Antrag an der langen Kante und die Tabellen an der kurzen Kante wenden; die Druckansicht zeigt den passenden Hinweis.
+- Die Tabellenseiten beginnen bei Seite 1. Die vorhandene Spaltenauswahl und Seiteneinteilung für lange Bemerkungen bleiben erhalten.
+- Die Voreinstellung für den Antrag heißt jetzt **Antrag in der Druckansicht vorauswählen**. Gespeicherte Voreinstellungen, Formularfelder, Unterschriften und das Berlin-Ausgabedatum bleiben erhalten.
+- Sicherheitsupdates: `sharp` 0.35.5 mit `librsvg` 2.63.2 und `source-map-js` 1.2.2; auch indirekte Paketaufrufer verwenden die korrigierten Versionen. Produktions-Audit ohne gemeldete Schwachstellen.
+- Keine Datenbankmigration oder Änderung vorhandener Fahrten und Einstellungen.
+
+## Image und Compose für 1.0.16
+
+`docker-compose.yaml` verwendet `ghcr.io/schiggyschubser/fahrtenbuch:1.0.16`.
+Der GitHub-Workflow veröffentlicht das Image für Linux AMD64 und ARM64 mit
+Build-Attestierung sowie das GitHub-Release `v1.0.16`. Bei einem Update ändert
+sich ausschließlich der Image-Verweis. Port `1357:3000`, Datenverzeichnis
+`./data:/app/data`, Netzwerke und Umgebungsvariablen bleiben gleich.
+
+## Prüfung, Kurztest und Rollback für 1.0.16
+
+81 Fachtests, acht Browsertests einschließlich Unterschrift und PDF-Seitenzahlen/
+Ausrichtung, ESLint, TypeScript, Versionskonsistenz, Produktions-Audit und
+Produktionsbuild. Das fertige Image wird mit einer temporären Datenbank auf
+Web-/API-Funktionen und die geladenen Bildbibliotheksversionen geprüft.
+
+Vor und nach einer Compose-Änderung `docker compose config --quiet` ausführen;
+die bisherige Compose-Datei sichern und das vorherige Image behalten.
+Nach einem freigegebenen Update muss der Container `healthy` sein und die
+Loginseite Version 1.0.16 zeigen. Die mobile API liefert ohne Token HTTP 401.
+Antrag und Tabellen einzeln als PDF speichern: nur Hochformat im Antrag, nur
+Querformat in den Tabellen und deren Seitenzählung ab 1. Optional die vorhandene
+Unterschrift in der Antragsvorschau einfügen und einen Duplex-Probedruck am
+verwendeten Drucker durchführen.
+
+Für den Rollback die gesicherte Compose-Datei wiederherstellen, mit
+`docker compose config --quiet` prüfen und nach Freigabe nur den App-Container
+mit `docker compose up -d --no-deps --no-build --pull never fahrtenbuch`
+neu erstellen. Die aktuelle Datenbank beibehalten; keine Volumes löschen und
+keine Datenrücksicherung durchführen. Die Vorversion enthält die alten
+Abhängigkeiten und die gemischte Druckausgabe. Weitere Details:
+[Druckausgabe](PRINT_OUTPUT_CHANGE.md),
+[Sicherheitsupdates](SECURITY_DEPENDENCY_UPDATE.md).
+
 # Version 1.0.15 · 03.10.2026
 
 - Reisewegsuche: Bei `Coii` zuerst `COII → …`, danach Treffer wie `AG → COII`; beide Gruppen alphabetisch nach deutscher Sortierung unabhängig von Groß-/Kleinschreibung. Ohne Suchtext erscheinen alle Einträge alphabetisch.

@@ -888,6 +888,7 @@ p { text-wrap: pretty; }
   .print-page-frame:last-child { break-after: auto; }
   .print-page-frame { page: trips; }
   .claim-page-frame { page: claim; width: 210mm; height: 297mm; margin: 0; break-after: page; box-shadow: none; }
+  .claim-page-frame:last-child { break-after: auto; }
 }
 
 /* Printed documents stay light regardless of the selected application theme. */

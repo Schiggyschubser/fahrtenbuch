@@ -2,7 +2,21 @@ import { expect, test } from "@playwright/test";
 import { THEMES } from "../../lib/themes";
 import { claimOutputDate, emptyClaimTemplate } from "../../lib/claim-template";
 
-test("Zeitraum bleibt in allen Themes lesbar; Antrag ist editierbar und optional vor den Fahrten", async ({ page }) => {
+function expectPdfPages(pdf: Buffer, count: number, orientation: "portrait" | "landscape") {
+  const objects = Array.from(pdf.toString("latin1").matchAll(/\d+ 0 obj\b([\s\S]*?)endobj/g), match => match[1]);
+  const pages = objects.filter(object => /\/Type\s*\/Page\b/.test(object));
+  expect(pages).toHaveLength(count);
+  for (const page of pages) {
+    const box = page.match(/\/MediaBox\s*\[\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s*\]/);
+    expect(box).not.toBeNull();
+    const width = Number(box![3]) - Number(box![1]);
+    const height = Number(box![4]) - Number(box![2]);
+    expect(width).toBeCloseTo(orientation === "portrait" ? 595.28 : 841.89, 0);
+    expect(height).toBeCloseTo(orientation === "portrait" ? 841.89 : 595.28, 0);
+  }
+}
+
+test("Zeitraum bleibt lesbar; Antrag und Fahrtentabellen werden getrennt gedruckt", async ({ page }) => {
   test.setTimeout(120_000);
   await page.goto("/login");
   expect((await page.request.get("/api/settings/claim-template")).status()).toBe(401);
@@ -40,7 +54,7 @@ test("Zeitraum bleibt in allen Themes lesbar; Antrag ist editierbar und optional
   await page.getByLabel("Wohnort", { exact: true }).fill("Musterstadt");
   await page.getByLabel("Dienststelle", { exact: true }).fill("Musterbehörde");
   await page.getByLabel("Ort bei der Unterschrift", { exact: true }).fill("Coburg");
-  await page.getByLabel("Antrag beim PDF-Export vorauswählen", { exact: true }).check();
+  await page.getByLabel("Antrag in der Druckansicht vorauswählen", { exact: true }).check();
   await page.getByRole("button", { name: "Antragsvorlage speichern" }).click();
   await expect(page.getByRole("status")).toHaveText("Die Antragsvorlage wurde gespeichert.");
   await page.getByRole("tab", { name: "Darstellung", exact: true }).click();
@@ -55,23 +69,44 @@ test("Zeitraum bleibt in allen Themes lesbar; Antrag ist editierbar und optional
   expect((await page.request.post("/api/trips", { data: { date: "2025-08-15", startTime: "08:00", endTime: "08:25", routePairId: route.id, direction: "A_TO_B", odometerStart: 1000 } })).ok()).toBe(true);
   await page.goto("/print?month=2025-08");
   await expect(page.locator(".print-pages")).toHaveAttribute("data-ready", "true");
+  const output = page.getByLabel("Ausgabe für PDF und Druck", { exact: true });
+  await expect(output).toHaveValue("claim");
   await expect(page.locator(".claim-page-frame")).toHaveCount(2);
+  await expect(page.locator(".print-pages .print-page-frame")).toHaveCount(0);
+  await expect(page.locator(".print-toolbar")).toContainText("an der langen Kante");
   await expect(page.locator(".claim-page-frame").first()).toContainText(claimOutputDate());
   await expect(page.locator(".claim-page-frame").first()).toContainText("2025");
-  await expect(page.locator(".print-document-footer").last()).toContainText("Seite 3 von 3");
-  await page.pdf({ path: "test-results/claim-with-trips.pdf", preferCSSPageSize: true, printBackground: true });
-  await page.getByLabel("Antrag voranstellen", { exact: true }).uncheck();
+  // Browser PDF export uses the same document as Ctrl+P, without toolbar buttons.
+  expectPdfPages(await page.pdf({ path: "test-results/claim-only.pdf", preferCSSPageSize: true, printBackground: true }), 2, "portrait");
+  await page.screenshot({ path: "test-results/claim-print-preview.png", fullPage: true });
+  await output.selectOption("trips");
   await expect(page.locator(".claim-page-frame")).toHaveCount(0);
+  await expect(page.locator(".print-toolbar")).toContainText("an der kurzen Kante");
   await expect(page.locator(".print-document-footer").last()).toContainText("Seite 1 von 1");
-  await page.pdf({ path: "test-results/trips-without-claim.pdf", preferCSSPageSize: true, printBackground: true });
-  await page.getByLabel("Antrag voranstellen", { exact: true }).check();
+  expectPdfPages(await page.pdf({ path: "test-results/trips-only.pdf", preferCSSPageSize: true, printBackground: true }), 1, "landscape");
+  await page.screenshot({ path: "test-results/trips-print-preview.png", fullPage: true });
+  // The explicit print button opens the dialog for the currently selected part.
+  await page.evaluate(() => { window.print = () => { document.documentElement.dataset.printCalled = "true"; window.dispatchEvent(new Event("beforeprint")); }; });
+  await page.getByRole("button", { name: "Fahrtentabellen drucken / PDF", exact: true }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-print-called", "true");
+  await output.selectOption("claim");
+  await page.evaluate(() => { delete document.documentElement.dataset.printCalled; });
+  await page.getByRole("button", { name: "Antrag drucken / PDF", exact: true }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-print-called", "true");
   const remark = Array.from({ length: 120 }, (_, index) => `Zeile ${index + 1}`).join("\n");
   expect((await page.request.post("/api/trips", { data: { date: "2025-09-15", startTime: "08:00", endTime: "08:25", routePairId: route.id, direction: "A_TO_B", odometerStart: 1012, remark } })).ok()).toBe(true);
   await page.goto("/print?month=2025-09");
   await expect(page.locator(".print-pages")).toHaveAttribute("data-ready", "true");
+  await output.selectOption("trips");
   expect(await page.locator(".print-page-frame").count()).toBeGreaterThan(1);
+  await expect(page.locator(".claim-page-frame")).toHaveCount(0);
   expect((await page.locator('.print-pages tbody td[data-column="remark"]').allTextContents()).join("")).toBe(remark);
-  await page.pdf({ path: "test-results/claim-with-multiple-trip-pages.pdf", preferCSSPageSize: true, printBackground: true });
+  const tripPageCount = await page.locator(".print-page-frame").count();
+  await expect(page.locator(".print-pages .print-document-footer").first()).toContainText(`Seite 1 von ${tripPageCount}`);
+  await expect(page.locator(".print-pages .print-document-footer").last()).toContainText(`Seite ${tripPageCount} von ${tripPageCount}`);
+  expectPdfPages(await page.pdf({ path: "test-results/trips-multiple-pages.pdf", preferCSSPageSize: true, printBackground: true }), tripPageCount, "landscape");
+  await output.selectOption("claim");
+  expectPdfPages(await page.pdf({ path: "test-results/claim-after-multiple-trips.pdf", preferCSSPageSize: true, printBackground: true }), 2, "portrait");
   await page.clock.install({ time: new Date("2026-10-03T22:30:00Z") });
   await page.evaluate(() => window.dispatchEvent(new Event("beforeprint")));
   await expect(page.locator(".claim-page-frame").first()).toContainText("04.10.2026");
