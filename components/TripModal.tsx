@@ -303,7 +303,19 @@ export function TripModal({ trip, defaultDate, suggestedOdometerStart, routeOpti
     return () => controller.abort();
   }, [trip]);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const deleteButtonRef = useRef<HTMLButtonElement>(null);
+  const confirmDeleteButtonRef = useRef<HTMLButtonElement>(null);
   const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    if (confirmDelete) confirmDeleteButtonRef.current?.focus({ preventScroll: true });
+  }, [confirmDelete]);
+
+  function cancelDelete() {
+    setConfirmDelete(false);
+    setError("");
+    requestAnimationFrame(() => deleteButtonRef.current?.focus({ preventScroll: true }));
+  }
 
   const distanceKm = selectedRoute?.distanceKm ?? trip?.distanceKm ?? 0;
   const odometerNumber = Number(odometerStart);
@@ -336,6 +348,7 @@ export function TripModal({ trip, defaultDate, suggestedOdometerStart, routeOpti
 
   function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (confirmDelete) return;
     setError("");
     if ((!trip || routeChanged) && !selectedRoute) {
       setError("Bitte wähle einen vorhandenen Reiseweg aus der Liste.");
@@ -358,17 +371,21 @@ export function TripModal({ trip, defaultDate, suggestedOdometerStart, routeOpti
       payload.direction = selectedRoute!.direction;
     }
     startTransition(async () => {
-      const response = await fetch(trip ? `/api/trips/${trip.id}` : "/api/trips", {
-        method: trip ? "PATCH" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const result = await response.json();
-      if (!response.ok) {
-        setError(result.error ?? "Die Fahrt konnte nicht gespeichert werden.");
-        return;
+      try {
+        const response = await fetch(trip ? `/api/trips/${trip.id}` : "/api/trips", {
+          method: trip ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const result = await response.json().catch(() => null);
+        if (!response.ok || !result?.trip) {
+          setError(result?.error ?? "Die Fahrt konnte nicht gespeichert werden.");
+          return;
+        }
+        onSaved(date);
+      } catch {
+        setError("Die Fahrt konnte nicht gespeichert werden. Bitte versuche es erneut.");
       }
-      onSaved(date);
     });
   }
 
@@ -376,13 +393,22 @@ export function TripModal({ trip, defaultDate, suggestedOdometerStart, routeOpti
     if (!trip) return;
     setError("");
     startTransition(async () => {
-      const response = await fetch(`/api/trips/${trip.id}`, { method: "DELETE" });
-      const result = await response.json();
-      if (!response.ok) {
-        setError(result.error ?? "Die Fahrt konnte nicht gelöscht werden.");
-        return;
+      const fallback = "Die Fahrt konnte nicht gelöscht werden. Bitte versuche es erneut.";
+      try {
+        const response = await fetch(`/api/trips/${trip.id}`, { method: "DELETE" });
+        const result = await response.json().catch(() => null);
+        if (!response.ok) {
+          setError(typeof result?.error === "string" ? result.error : fallback);
+          return;
+        }
+        if (result?.ok !== true) {
+          setError(fallback);
+          return;
+        }
+        onSaved(trip.date);
+      } catch {
+        setError(fallback);
       }
-      onSaved(trip.date);
     });
   }
 
@@ -421,7 +447,6 @@ export function TripModal({ trip, defaultDate, suggestedOdometerStart, routeOpti
             </div>
           </div>
 
-          {error ? <p role="alert" className="status-enter rounded-xl border border-[var(--danger-line)] bg-[var(--danger-soft)] px-4 py-3 text-sm font-medium text-[var(--danger)]">{error}</p> : null}
           <div>
             <label className="label" htmlFor="trip-staff">Mitgenommene Bedienstete</label>
             <textarea id="trip-staff" className="field" rows={2} maxLength={2000} value={accompanyingStaff} onChange={(event) => setAccompanyingStaff(event.target.value)} />
@@ -445,24 +470,32 @@ export function TripModal({ trip, defaultDate, suggestedOdometerStart, routeOpti
               <p className="mt-2 text-xs text-[var(--muted)]">Vorlagentexte kannst du frei bearbeiten oder ergänzen.</p>
             </div>
           </div>
-          {confirmDelete ? (
-            <div className="status-enter flex flex-col gap-3 rounded-xl border border-[var(--danger-line)] bg-[var(--danger-soft)] px-4 py-3 text-sm text-[var(--danger-strong)] sm:flex-row sm:items-center sm:justify-between">
-              <span>Diese Fahrt wirklich dauerhaft löschen?</span>
-              <div className="flex gap-2">
-                <button type="button" className="btn-ghost min-h-8 px-3 py-1" onClick={() => setConfirmDelete(false)}>Abbrechen</button>
-                <button type="button" className="btn-danger min-h-8 px-3 py-1" onClick={remove} disabled={isPending}>Löschen</button>
-              </div>
-            </div>
-          ) : null}
         </div>
 
-        <footer className="sticky bottom-0 z-10 flex flex-col-reverse gap-3 border-t border-[var(--line)] bg-[var(--surface-muted)] px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-7">
-          <div>{trip && !confirmDelete ? <button type="button" className="btn-danger focus-ring" onClick={() => setConfirmDelete(true)}>Fahrt löschen</button> : null}</div>
-          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
-            <button type="button" className="btn-secondary focus-ring" onClick={requestClose}>Abbrechen</button>
-            <button type="submit" className="btn-primary focus-ring min-w-28" disabled={isPending || !remarkSettings}>{isPending ? "Speichern …" : "Speichern"}</button>
-          </div>
-        </footer>
+        {confirmDelete && trip ? (
+          <footer className="sticky bottom-0 z-10 space-y-3 border-t border-[var(--danger-line)] bg-[var(--surface-muted)] px-5 py-4 sm:px-7">
+            <div className="text-sm text-[var(--danger-strong)]">
+              <p className="font-bold">Fahrt Nr. {trip.sequenceNumber} wirklich dauerhaft löschen?</p>
+              <p>Die laufenden Nummern aller nachfolgenden Fahrten werden automatisch angepasst.</p>
+            </div>
+            {error ? <p role="alert" className="text-sm font-medium text-[var(--danger)]">{error}</p> : null}
+            <div className="flex justify-end gap-3">
+              <button type="button" className="btn-secondary focus-ring" onClick={cancelDelete} disabled={isPending}>Abbrechen</button>
+              <button ref={confirmDeleteButtonRef} type="button" className="btn-danger focus-ring" onClick={remove} disabled={isPending}>{isPending ? "Löschen …" : "Löschen"}</button>
+            </div>
+          </footer>
+        ) : (
+          <footer className="sticky bottom-0 z-10 space-y-3 border-t border-[var(--line)] bg-[var(--surface-muted)] px-5 py-4 sm:px-7">
+            {error ? <p role="alert" className="text-sm font-medium text-[var(--danger)]">{error}</p> : null}
+            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>{trip ? <button ref={deleteButtonRef} type="button" className="btn-danger focus-ring" onClick={() => { setError(""); setConfirmDelete(true); }}>Fahrt löschen</button> : null}</div>
+              <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
+              <button type="button" className="btn-secondary focus-ring" onClick={requestClose}>Abbrechen</button>
+              <button type="submit" className="btn-primary focus-ring min-w-28" disabled={isPending || !remarkSettings}>{isPending ? "Speichern …" : "Speichern"}</button>
+            </div>
+            </div>
+          </footer>
+        )}
       </form>
       )}
     </Modal>

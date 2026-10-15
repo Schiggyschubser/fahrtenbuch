@@ -161,7 +161,7 @@ test("Globale Spaltenauswahl, Desktopbreiten, mobile Ansicht und Druck", async (
   await expect(page.getByTestId("desktop-trip").locator('[data-column="remark"]')).toBeVisible();
   // An individual entry taller than A4 continues without dropping its text.
   const longRemark = Array.from({ length: 120 }, (_, index) => `Zeile ${String(index + 1).padStart(3, "0")}\n`).join("").trim();
-  expect((await page.request.post("/api/trips", { data: { date: "2041-01-01", startTime: "08:00", endTime: "08:30", odometerStart: 1234567, routePairId, direction: "A_TO_B", remark: longRemark } })).ok()).toBe(true);
+  expect((await page.request.post("/api/trips", { data: { date: "2041-01-01", startTime: "08:00", endTime: "08:30", odometerStart: 1234590, routePairId, direction: "A_TO_B", remark: longRemark } })).ok()).toBe(true);
   await page.goto("/print?month=2041-01");
   await expect(page.locator(".print-pages")).toHaveAttribute("data-ready", "true");
   expect(await page.locator(".print-pages .print-sheet").count()).toBeGreaterThan(1);

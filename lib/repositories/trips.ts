@@ -7,8 +7,9 @@ import { unreimbursedKm } from "../kilometers";
 import { potentialReimbursementCents } from "../money";
 import type { MonthDataDto, TripCsvImportResultDto, TripDateRangeDto, TripDto } from "../types";
 import { tripCsvDuplicateKey, type TripCsvRow } from "../trip-csv";
-import { getActiveRoutePair } from "./routes";
 import { getRemarkSettings } from "./remarks";
+import { assertTripChronology } from "../trip-chronology";
+import { createTripSchema, updateTripSchema } from "../validation";
 
 export function tripToDto(row: typeof trips.$inferSelect): TripDto {
   const pair = row.routePairId !== null && row.direction !== null
@@ -158,9 +159,10 @@ export async function importTripsFromCsv(rows: TripCsvRow[]): Promise<TripCsvImp
     ) VALUES (?, ?, ?, NULL, NULL, ?, '', ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?)
   `);
   sqlite.transaction(() => {
+    const inserted: Array<{ row: TripCsvRow; id: number }> = [];
     for (const row of pending) {
       const distanceKm = row.odometerEnd - row.odometerStart;
-      insert.run(
+      const result = insert.run(
         row.date,
         row.startTime,
         row.endTime,
@@ -176,8 +178,12 @@ export async function importTripsFromCsv(rows: TripCsvRow[]): Promise<TripCsvImp
         row.accompanyingStaff ?? "",
         row.remark ?? "",
       );
+      inserted.push({ row, id: Number(result.lastInsertRowid) });
     }
-  })();
+    // Validate the final batch, independent of the order of rows in the CSV.
+    // A conflict throws and rolls back every insertion in this transaction.
+    for (const { row, id } of inserted) assertTripChronology({ ...row, distanceKm: row.odometerEnd - row.odometerStart }, id);
+  }).immediate();
   return {
     imported: pending.length,
     skipped,
@@ -193,23 +199,27 @@ export async function createTrip(input: TripInput) {
 // Synchronous so mobile submissions and their receipt can commit atomically.
 export function createTripSync(input: TripInput) {
   ensureDatabaseReady();
-  const pair = db.select().from(routePairs).where(eq(routePairs.id, input.routePairId)).get();
-  const settings = db.select().from(appSettings).where(eq(appSettings.id, 1)).get();
-  if (!pair || pair.archivedAt) throw new Error("Der gewählte Reiseweg ist nicht mehr verfügbar.");
-  if (!settings) throw new Error("Die Abrechnungseinstellungen konnten nicht geladen werden.");
-  const remarkSettings = input.remark === undefined ? getRemarkSettings() : null;
-  const defaultRemark = remarkSettings?.templates.find((template) => template.id === remarkSettings.defaultTemplateId)?.text ?? "";
-  const now = new Date().toISOString();
-  const created = db.insert(trips).values({
-    ...input,
-    accompanyingStaff: input.accompanyingStaff?.trim() ?? "",
-    remark: input.remark?.trim() ?? defaultRemark,
-    ...routeSnapshot(pair, input.direction),
-    reimbursementRateCentsSnapshot: settings.reimbursementRateCents,
-    createdAt: now,
-    updatedAt: now,
-  }).returning().get();
-  return tripToDto(created);
+  input = createTripSchema.parse(input);
+  return sqlite.transaction(() => {
+    const pair = db.select().from(routePairs).where(eq(routePairs.id, input.routePairId)).get();
+    const settings = db.select().from(appSettings).where(eq(appSettings.id, 1)).get();
+    if (!pair || pair.archivedAt) throw new Error("Der gewählte Reiseweg ist nicht mehr verfügbar.");
+    if (!settings) throw new Error("Die Abrechnungseinstellungen konnten nicht geladen werden.");
+    const remarkSettings = input.remark === undefined ? getRemarkSettings() : null;
+    const defaultRemark = remarkSettings?.templates.find((template) => template.id === remarkSettings.defaultTemplateId)?.text ?? "";
+    const now = new Date().toISOString();
+    assertTripChronology({ ...input, distanceKm: pair.distanceKm });
+    const created = db.insert(trips).values({
+      ...input,
+      accompanyingStaff: input.accompanyingStaff?.trim() ?? "",
+      remark: input.remark?.trim() ?? defaultRemark,
+      ...routeSnapshot(pair, input.direction),
+      reimbursementRateCentsSnapshot: settings.reimbursementRateCents,
+      createdAt: now,
+      updatedAt: now,
+    }).returning().get();
+    return tripToDto(created);
+  }).immediate();
 }
 
 export async function updateTrip(id: number, input: Omit<TripInput, "routePairId" | "direction"> & {
@@ -217,33 +227,45 @@ export async function updateTrip(id: number, input: Omit<TripInput, "routePairId
   direction?: Direction;
 }, expectedUpdatedAt?: string) {
   ensureDatabaseReady();
-  const existing = await getTrip(id);
-  if (!existing) return null;
-  if (expectedUpdatedAt !== undefined && existing.updatedAt !== expectedUpdatedAt) return null;
-  let routeValues = {};
-  if (input.routePairId && input.direction) {
-    const pair = await getActiveRoutePair(input.routePairId);
-    if (!pair) throw new Error("Der gewählte Reiseweg ist nicht mehr verfügbar.");
-    routeValues = {
-      originFullNameSnapshot: "",
-      destinationFullNameSnapshot: "",
-      routePairId: input.routePairId,
-      direction: input.direction,
-      ...routeSnapshot(pair, input.direction),
-    };
-  }
-  const [updated] = await db.update(trips).set({
-    accompanyingStaff: input.accompanyingStaff?.trim() ?? existing.accompanyingStaff,
-    remark: input.remark?.trim() ?? existing.remark,
-    date: input.date,
-    startTime: input.startTime,
-    endTime: input.endTime,
-    odometerStart: input.odometerStart,
-    ...routeValues,
-    updatedAt: new Date(Math.max(Date.now(), Date.parse(existing.updatedAt) + 1)).toISOString(),
-  }).where(expectedUpdatedAt === undefined ? eq(trips.id, id) :
-    and(eq(trips.id, id), eq(trips.updatedAt, expectedUpdatedAt))).returning();
-  return updated ? tripToDto(updated) : null;
+  return sqlite.transaction(() => {
+    const existing = db.select().from(trips).where(eq(trips.id, id)).get();
+    if (!existing) return null;
+    if (expectedUpdatedAt !== undefined && existing.updatedAt !== expectedUpdatedAt) return null;
+    input = updateTripSchema.parse(input);
+    let routeValues = {};
+    let distanceKm = existing.distanceKmSnapshot;
+    if (input.routePairId && input.direction) {
+      const pair = db.select().from(routePairs).where(eq(routePairs.id, input.routePairId)).get();
+      if (!pair || pair.archivedAt) throw new Error("Der gewählte Reiseweg ist nicht mehr verfügbar.");
+      distanceKm = pair.distanceKm;
+      routeValues = {
+        originFullNameSnapshot: "",
+        destinationFullNameSnapshot: "",
+        routePairId: input.routePairId,
+        direction: input.direction,
+        ...routeSnapshot(pair, input.direction),
+      };
+    }
+    // Text-only edits remain possible for historical entries. Every change to
+    // chronology or mileage is checked against the actual proposed distance.
+    if (input.date !== existing.date || input.startTime !== existing.startTime || input.endTime !== existing.endTime
+      || input.odometerStart !== existing.odometerStart || distanceKm !== existing.distanceKmSnapshot
+      || (input.routePairId !== undefined && (input.routePairId !== existing.routePairId || input.direction !== existing.direction))) {
+      assertTripChronology({ ...input, distanceKm }, id);
+    }
+    const updated = db.update(trips).set({
+      accompanyingStaff: input.accompanyingStaff?.trim() ?? existing.accompanyingStaff,
+      remark: input.remark?.trim() ?? existing.remark,
+      date: input.date,
+      startTime: input.startTime,
+      endTime: input.endTime,
+      odometerStart: input.odometerStart,
+      ...routeValues,
+      updatedAt: new Date(Math.max(Date.now(), Date.parse(existing.updatedAt) + 1)).toISOString(),
+    }).where(expectedUpdatedAt === undefined ? eq(trips.id, id) :
+      and(eq(trips.id, id), eq(trips.updatedAt, expectedUpdatedAt))).returning().get();
+    return updated ? tripToDto(updated) : null;
+  }).immediate();
 }
 
 export async function deleteTrip(id: number, expectedUpdatedAt?: string) {

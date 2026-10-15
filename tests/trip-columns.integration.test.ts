@@ -10,17 +10,17 @@ describe("Laufende Nummern und Spalten", () => {
   beforeAll(() => { ensureDatabaseReady(); sqlite.exec("DELETE FROM trips; DELETE FROM route_pairs"); });
   it("nummeriert global, nach Datum, Beginn und ID und berechnet nach Änderungen neu", async () => {
     const pair = await createRoutePair({ placeA: "A", placeB: "B", distanceKm: 10, reimbursedKm: 7, durationMinutes: 20 });
-    const input = { date: "2026-02-01", startTime: "08:00", endTime: "08:20", odometerStart: 100, routePairId: pair.id, direction: "A_TO_B" as const };
+    const input = { date: "2026-02-01", startTime: "08:00", endTime: "08:20", odometerStart: 200, routePairId: pair.id, direction: "A_TO_B" as const };
     const first = await createTrip(input);
-    const second = await createTrip(input);
-    await createTrip({ ...input, date: "2026-01-31" });
+    const second = await createTrip({ ...input, startTime: "09:00", endTime: "09:20", odometerStart: 210 });
+    await createTrip({ ...input, date: "2026-01-31", odometerStart: 180 });
     expect((await getTripsForMonth("2026-02")).trips.map((trip) => [trip.id, trip.sequenceNumber])).toEqual([[first.id, 2], [second.id, 3]]);
     expect((await getTripsForDateRange("2026-02-01", "2026-02-01")).map((trip) => trip.sequenceNumber)).toEqual([2, 3]);
-    await updateTrip(second.id, { ...input, date: "2026-01-01" });
+    await updateTrip(second.id, { ...input, date: "2026-01-01", odometerStart: 160 });
     expect((await getTripsForMonth("2026-02")).trips[0].sequenceNumber).toBe(3);
     await deleteTrip(second.id);
     expect((await getTripsForMonth("2026-02")).trips[0].sequenceNumber).toBe(2);
-    await importTripsFromCsv(parseTripCsv(serializeTripCsv([{ ...first, sequenceNumber: 999, date: "2025-12-31" }])));
+    await importTripsFromCsv(parseTripCsv(serializeTripCsv([{ ...first, sequenceNumber: 999, date: "2025-12-31", odometerStart: 140, odometerEnd: 150 }])));
     expect((await getTripsForMonth("2025-12")).trips[0].sequenceNumber).toBe(1);
     expect((await getTripsForMonth("2026-02")).trips[0].sequenceNumber).toBe(3);
   });

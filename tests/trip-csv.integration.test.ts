@@ -20,8 +20,8 @@ describe("CSV-Import und -Export", () => {
     startTime: "07:30",
     endTime: "08:15",
     routeLabel: "Freier Importweg",
-    odometerStart: 5000,
-    odometerEnd: 5017,
+    odometerStart: 500,
+    odometerEnd: 517,
   };
 
   beforeAll(() => ensureDatabaseReady());
@@ -82,8 +82,8 @@ describe("CSV-Import und -Export", () => {
       distanceKm: 17,
       reimbursedKm: 17,
       reimbursementRateCents: 40,
-      odometerStart: 5000,
-      odometerEnd: 5017,
+      odometerStart: 500,
+      odometerEnd: 517,
       isChecked: false,
     }));
 

@@ -87,7 +87,7 @@ export const remarkSettingsSchema = z.object({
 const tripBaseSchema = z.object({
   accompanyingStaff: z.string().trim().max(2000).optional(),
   remark: z.string().trim().max(2000).optional(),
-  date: z.string().regex(datePattern, "Ungültiges Datum."),
+  date: dateSchema,
   startTime: z.string().regex(timePattern, "Ungültige Beginnzeit."),
   endTime: z.string().regex(timePattern, "Ungültige Endzeit."),
   odometerStart: z.number().int().nonnegative("Der Kilometerstand darf nicht negativ sein.").max(100000000),

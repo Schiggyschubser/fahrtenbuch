@@ -86,7 +86,7 @@ describe("Fahrten-Repository", () => {
         origin_snapshot, destination_snapshot, distance_km_snapshot,
         reimbursed_km_snapshot, odometer_start, created_at, updated_at
       ) VALUES (?, ?, ?, NULL, NULL, ?, '', ?, ?, ?, ?, ?)
-    `).run("2023-07-17", "08:50", "14:50", "Standort A, Standort B, Standort C", 24, 24, 41746, now, now);
+    `).run("2023-07-17", "08:50", "14:50", "Standort A, Standort B, Standort C", 24, 24, 100, now, now);
 
     const [trip] = (await getTripsForMonth("2023-07")).trips;
     expect(trip.routePairId).toBeNull();
@@ -119,8 +119,8 @@ describe("Fahrten-Repository", () => {
   it("ergaenzt bestehende Fahrten in beiden Richtungen und bewahrt die Zuordnung", async () => {
     const input = { placeA: "HH", placeB: "B", distanceKm: 10, reimbursedKm: 10, durationMinutes: 20 };
     const route = await createRoutePair(input);
-    const forward = await createTrip({ date: "2030-01-01", startTime: "08:00", endTime: "08:20", odometerStart: 0, routePairId: route.id, direction: "A_TO_B" });
-    const reverse = await createTrip({ date: "2030-01-01", startTime: "09:00", endTime: "09:20", odometerStart: 10, routePairId: route.id, direction: "B_TO_A" });
+    const forward = await createTrip({ date: "2030-01-01", startTime: "08:00", endTime: "08:20", odometerStart: 2000, routePairId: route.id, direction: "A_TO_B" });
+    const reverse = await createTrip({ date: "2030-01-01", startTime: "09:00", endTime: "09:20", odometerStart: 2010, routePairId: route.id, direction: "B_TO_A" });
     expect(forward.originFullName).toBe("");
     await updateRoutePair(route.id, { ...input, placeAFullName: " Hamburg  Zentrale ", placeBFullName: "Berlin" });
     const rows = (await getTripsForMonth("2030-01")).trips;

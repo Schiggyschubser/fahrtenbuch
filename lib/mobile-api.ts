@@ -7,6 +7,7 @@ import { MobileApiError, mobileTripRevisionSchema, mobileTripUpdateSchema, submi
 import { beginTwoFactorLogin, completeTwoFactorLogin } from "./repositories/two-factor";
 import { getActiveRoutePairs, toRouteOptions } from "./repositories/routes";
 import { deleteTrip, getTrip, getSuggestedOdometer, getTripsForMonth, tripToDto, updateTrip } from "./repositories/trips";
+import { TripChronologyError } from "./trip-chronology";
 import { getRemarkSettings } from "./repositories/remarks";
 import { getReimbursementSettings, getVehicleSettings } from "./repositories/settings";
 import { dateSchema, loginSchema, monthSchema, twoFactorChallengeSchema } from "./validation";
@@ -121,6 +122,7 @@ export async function handleMobileApi(request: Request, path: string[]) {
       default: return json({ code: "NOT_FOUND", error: "API-Endpunkt nicht gefunden." }, 404);
     }
   } catch (error) {
+    if (error instanceof TripChronologyError) return json({ code: error.code, error: error.message }, 409);
     if (error instanceof ZodError) return json({ code: "VALIDATION_ERROR", error: error.issues[0]?.message, issues: error.issues.map(({ path, message }) => ({ path, message })) }, 400);
     if (error instanceof MobileApiError) return json({ code: error.code, error: error.message }, error.status);
     // Do not log request bodies, tokens, passwords, or database values.

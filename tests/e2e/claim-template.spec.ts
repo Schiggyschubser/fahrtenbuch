@@ -66,7 +66,7 @@ test("Zeitraum bleibt lesbar; Antrag und Fahrtentabellen werden getrennt gedruck
   await page.screenshot({ path: "test-results/claim-settings.png", fullPage: true });
   // Known export month; the signature date must be today, not this month.
   const { route } = await (await page.request.post("/api/routes", { data: { placeA: "Antrag Start", placeB: "Antrag Ziel", distanceKm: 12, reimbursedKm: 12, durationMinutes: 25 } })).json();
-  expect((await page.request.post("/api/trips", { data: { date: "2025-08-15", startTime: "08:00", endTime: "08:25", routePairId: route.id, direction: "A_TO_B", odometerStart: 1000 } })).ok()).toBe(true);
+  expect((await page.request.post("/api/trips", { data: { date: "2025-08-15", startTime: "08:00", endTime: "08:25", routePairId: route.id, direction: "A_TO_B", odometerStart: 900 } })).ok()).toBe(true);
   await page.goto("/print?month=2025-08");
   await expect(page.locator(".print-pages")).toHaveAttribute("data-ready", "true");
   const output = page.getByLabel("Ausgabe für PDF und Druck", { exact: true });
@@ -94,7 +94,7 @@ test("Zeitraum bleibt lesbar; Antrag und Fahrtentabellen werden getrennt gedruck
   await page.getByRole("button", { name: "Antrag drucken / PDF", exact: true }).click();
   await expect(page.locator("html")).toHaveAttribute("data-print-called", "true");
   const remark = Array.from({ length: 120 }, (_, index) => `Zeile ${index + 1}`).join("\n");
-  expect((await page.request.post("/api/trips", { data: { date: "2025-09-15", startTime: "08:00", endTime: "08:25", routePairId: route.id, direction: "A_TO_B", odometerStart: 1012, remark } })).ok()).toBe(true);
+  expect((await page.request.post("/api/trips", { data: { date: "2025-09-15", startTime: "08:00", endTime: "08:25", routePairId: route.id, direction: "A_TO_B", odometerStart: 912, remark } })).ok()).toBe(true);
   await page.goto("/print?month=2025-09");
   await expect(page.locator(".print-pages")).toHaveAttribute("data-ready", "true");
   await output.selectOption("trips");

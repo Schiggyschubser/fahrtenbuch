@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
 import { firstZodMessage } from "./validation";
 import { ZodError } from "zod";
+import { TripChronologyError } from "./trip-chronology";
 
 export function unauthorizedResponse() {
   return NextResponse.json({ error: "Nicht angemeldet." }, { status: 401 });
 }
 
 export function errorResponse(error: unknown, fallback = "Die Anfrage konnte nicht verarbeitet werden.") {
+  if (error instanceof TripChronologyError) return NextResponse.json({ error: error.message, code: error.code }, { status: 409 });
   if (error instanceof ZodError) {
     return NextResponse.json({ error: firstZodMessage(error) }, { status: 400 });
   }

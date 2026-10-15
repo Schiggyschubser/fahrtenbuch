@@ -42,7 +42,7 @@ test("Bemerkungsvorlagen, Fahrttexte und CSV funktionieren auf Desktop, mobil un
   await page.getByRole("option", { name: /HH-Texte.*B-Texte/ }).click();
   await dialog.getByLabel("Datum").fill("2038-03-01");
   await dialog.getByLabel("Beginn", { exact: true }).fill("08:00");
-  await dialog.getByLabel("KM Beginn").fill("1000");
+  await dialog.getByLabel("KM Beginn").fill("2000");
   await dialog.getByRole("button", { name: "Speichern", exact: true }).click();
   await expect(dialog).toBeHidden();
   await expect(page.getByRole("columnheader", { name: "Mitgenommene Bedienstete", exact: true })).toBeVisible();
@@ -60,7 +60,7 @@ test("Bemerkungsvorlagen, Fahrttexte und CSV funktionieren auf Desktop, mobil un
   await page.getByRole("option", { name: /HH-Texte.*B-Texte/ }).click();
   await dialog.getByLabel("Datum").fill("2038-03-02");
   await dialog.getByLabel("Beginn", { exact: true }).fill("08:00");
-  await dialog.getByLabel("KM Beginn").fill("1018");
+  await dialog.getByLabel("KM Beginn").fill("2018");
   await dialog.getByRole("button", { name: "Speichern", exact: true }).click();
   await expect(dialog).toBeHidden();
   const tripResponse = await page.request.get("/api/trips?month=2038-03");
@@ -79,7 +79,7 @@ test("Bemerkungsvorlagen, Fahrttexte und CSV funktionieren auf Desktop, mobil un
   const longRemark = "Ausführliche Besprechung mit zusätzlichen Informationen und mehreren beteiligten Stellen. ".repeat(8).trim();
   for (let day = 3; day <= 20; day++) {
     const response = await page.request.post("/api/trips", { data: {
-      date: `2038-03-${String(day).padStart(2, "0")}`, startTime: "08:00", endTime: "08:30", odometerStart: 1000 + day * 18,
+      date: `2038-03-${String(day).padStart(2, "0")}`, startTime: "08:00", endTime: "08:30", odometerStart: 2000 + day * 18,
       routePairId: routeId, direction: day % 2 ? "A_TO_B" : "B_TO_A", accompanyingStaff: staff, remark: longRemark,
     } });
     expect(response.ok()).toBe(true);

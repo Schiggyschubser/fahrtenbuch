@@ -106,10 +106,24 @@ try {
   const updated = (await changed.json()).trip;
   assert.equal(updated.odometerStart, 1100);
   assert.equal(updated.odometerEnd, 1120);
+  const following = await post("/api/trips", { ...input, date: "2026-10-01", odometerStart: 1200 }, { Cookie });
+  assert.equal(following.status, 201);
+  const followingTrip = (await following.json()).trip;
+  const conflict = await mutation("PUT", { expectedUpdatedAt: updated.updatedAt, date: updated.date,
+    startTime: updated.startTime, endTime: updated.endTime, odometerStart: 1190 });
+  assert.equal(conflict.status, 409);
+  assert.equal((await conflict.json()).code, "TRIP_CHRONOLOGY_CONFLICT");
+  const overlap = await post("/api/v1/trips", { ...input, clientTripId: randomUUID(), odometerStart: 1120 }, { Authorization });
+  assert.equal(overlap.status, 409);
+  assert.equal((await overlap.json()).code, "TRIP_CHRONOLOGY_CONFLICT");
   assert.equal((await mutation("DELETE", { expectedUpdatedAt: saved.trip.updatedAt })).status, 409);
   assert.equal((await mutation("DELETE", { expectedUpdatedAt: updated.updatedAt })).status, 200);
   assert.equal((await post("/api/v1/trips", input, { Authorization })).status, 200);
   assert.equal((await (await fetch(`${base}/api/trips?month=2026-09`, { headers: { Cookie } })).json()).trips.length, 0);
+  const renumbered = (await (await fetch(`${base}/api/trips?month=2026-10`, { headers: { Cookie } })).json()).trips[0];
+  assert.equal(renumbered.id, followingTrip.id);
+  assert.equal(renumbered.sequenceNumber, followingTrip.sequenceNumber - 1);
+  assert.equal(renumbered.odometerStart, followingTrip.odometerStart);
   for (const [placeA, placeB] of [["COII", "Zentrale"], ["AG", "COII"], ["COII", "Büro"]]) {
     assert.equal((await post("/api/routes", { placeA, placeB, distanceKm: 20, reimbursedKm: 15, durationMinutes: 30 }, { Cookie })).status, 201);
   }
@@ -124,5 +138,5 @@ try {
   }
   assert.equal((await post("/api/v1/auth/logout", {}, { Authorization })).status, 200);
   assert.equal((await fetch(`${base}/api/v1/me`, { headers: { Authorization } })).status, 401);
-  console.log("Container smoke passed: separate claim/trip print outputs, web/mobile login, trip, restart/retry persistence, web visibility, edit/delete with revision checks, immutable receipt, logout, claim template and signature validation/persistence/removal, both form pages, route search order through web/mobile APIs and bootstrap.");
+  console.log("Container smoke passed: chronology conflicts on create/edit, cross-month renumbering after deletion, separate claim/trip print outputs, web/mobile login, restart/retry persistence, edit/delete with revision checks, immutable receipt, logout, claim template and signature validation/persistence/removal, route search through web/mobile APIs.");
 } finally { await stop(); }

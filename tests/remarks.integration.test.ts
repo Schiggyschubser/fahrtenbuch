@@ -17,19 +17,20 @@ describe("Fahrttexte und Bemerkungsvorlagen", () => {
     expect(old.remark).toBe("");
     const settings = updateRemarkSettings({ templates: [{ text: "  Dienstbesprechung  " }, { text: "Ortstermin" }], defaultTemplateIndex: 0 });
     expect(settings.templates[0].text).toBe("Dienstbesprechung");
-    const trip = await createTrip({ ...input, accompanyingStaff: "  Müller\nSchmidt  " });
+    const tripInput = { ...input, date: "2036-01-02", odometerStart: 110 };
+    const trip = await createTrip({ ...tripInput, accompanyingStaff: "  Müller\nSchmidt  " });
     expect(trip).toMatchObject({ remark: "Dienstbesprechung", accompanyingStaff: "Müller\nSchmidt" });
-    const blank = await createTrip({ ...input, remark: "" });
+    const blank = await createTrip({ ...input, date: "2036-01-03", odometerStart: 120, remark: "" });
     expect(blank.remark).toBe("");
-    const custom = await createTrip({ ...input, remark: "Eigener Text" });
+    const custom = await createTrip({ ...input, date: "2036-01-04", odometerStart: 130, remark: "Eigener Text" });
     expect(custom.remark).toBe("Eigener Text");
     const changed = updateRemarkSettings({ templates: settings.templates.map((item) => ({ ...item, text: item.text + " geändert" })), defaultTemplateIndex: 1 });
-    const preserved = await updateTrip(trip.id, input);
+    const preserved = await updateTrip(trip.id, tripInput);
     expect(preserved).toMatchObject({ remark: "Dienstbesprechung", accompanyingStaff: "Müller\nSchmidt" });
     expect((await getTripsForMonth("2036-01")).trips.find((item) => item.id === old.id)?.remark).toBe("");
     updateRemarkSettings({ templates: [changed.templates[0]], defaultTemplateIndex: null });
     expect(getRemarkSettings().defaultTemplateId).toBeNull();
-    expect((await updateTrip(trip.id, { ...input, remark: "", accompanyingStaff: "" }))?.remark).toBe("");
+    expect((await updateTrip(trip.id, { ...tripInput, remark: "", accompanyingStaff: "" }))?.remark).toBe("");
     updateRemarkSettings({ templates: [], defaultTemplateIndex: null });
   });
 
@@ -38,7 +39,7 @@ describe("Fahrttexte und Bemerkungsvorlagen", () => {
     const route = await createRoutePair(pairInput);
     updateRemarkSettings({ templates: [{ text: "Standard darf nicht importiert werden" }], defaultTemplateIndex: 0 });
     const originals = await Promise.all((["A_TO_B", "B_TO_A"] as const).map((direction, index) => createTrip({
-      date: "2037-02-01", startTime: index ? "10:00" : "08:00", endTime: index ? "10:30" : "08:30", odometerStart: 100 + index * 18,
+      date: "2037-02-01", startTime: index ? "10:00" : "08:00", endTime: index ? "10:30" : "08:30", odometerStart: 200 + index * 18,
       routePairId: route.id, direction, accompanyingStaff: 'Müller; "Anna"\nSchmidt', remark: 'Besprechung; "Projekt"\nZweite Zeile',
     })));
     const parsed = parseTripCsv(serializeTripCsv(originals));
@@ -51,8 +52,9 @@ describe("Fahrttexte und Bemerkungsvorlagen", () => {
     expect(parseTripCsv(serializeTripCsv(restored))).toEqual(parsed);
     expect(restored.every((trip) => trip.routePairId === null)).toBe(true);
     expect(await importTripsFromCsv(parsed)).toMatchObject({ imported: 0, skipped: 2 });
-    expect(await importTripsFromCsv([{ ...parsed[0], remark: "Anderer Text" }])).toMatchObject({ imported: 1, skipped: 0 });
-    const legacy = parseTripCsv("Datum;Beginn;Ende;Reiseweg;KM Beginn;KM Ende\n2037-02-02;08:00;08:30;Alt;200;218");
+    await expect(importTripsFromCsv([{ ...parsed[0], remark: "Anderer Text" }])).rejects.toThrow(/überschneidet/);
+    expect((await getTripsForMonth("2037-02")).trips).toEqual(restored);
+    const legacy = parseTripCsv("Datum;Beginn;Ende;Reiseweg;KM Beginn;KM Ende\n2037-02-02;08:00;08:30;Alt;300;318");
     await importTripsFromCsv(legacy);
     expect((await getTripsForMonth("2037-02")).trips.find((trip) => trip.routeLabel === "Alt")).toMatchObject({ remark: "", accompanyingStaff: "", originFullName: "", destinationFullName: "" });
     expect(await importTripsFromCsv(legacy)).toMatchObject({ imported: 0, skipped: 1 });

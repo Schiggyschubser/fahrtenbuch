@@ -1,3 +1,14 @@
+# Version 1.0.17 · 15.10.2026
+
+- Löschbestätigung direkt in der sichtbaren Fußleiste, mit Fahrtnummer und Hinweis auf das automatische Nachrücken aller späteren Nummern.
+- Tastaturfokus auf die Bestätigung; Abbrechen kehrt zum Löschbutton zurück.
+- Verbindungsfehler und ungültige Serverantworten zeigen eine sichtbare Fehlermeldung und erlauben einen erneuten Versuch.
+- Desktop und Mobil: Löschen, Abbrechen, Fehlerfälle und Folgenummerierung in Monatsansicht, Folgemonat, CSV und Druck geprüft.
+- Chronologieschutz beim Anlegen und Bearbeiten: keine Zeitüberschneidungen oder rückläufigen Kilometerstände; Reisewegwechsel, mobile API und atomare CSV-Importe eingeschlossen. Prüfung und Speichern erfolgen gemeinsam unter einer SQLite-Schreibsperre.
+- Keine Änderung am Datenbankschema; technische IDs, Kilometerstände und übrige Fahrtdaten werden nicht umnummeriert.
+- Image für AMD64 und ARM64: `ghcr.io/schiggyschubser/fahrtenbuch:1.0.17`; Compose verwendet diesen festen Tag.
+- Update und Rollback: [DELETE_FIX.md](DELETE_FIX.md).
+
 # Version 1.0.16 · 09.10.2026
 
 - Druckansicht: unter **Ausgabe für PDF und Druck** entweder **Antrag · Hochformat** oder **Fahrtentabellen · Querformat** auswählen. Vorschau, PDF und Druck enthalten nur den gewählten Teil, auch beim Browser-Druckbefehl.

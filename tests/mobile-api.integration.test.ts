@@ -74,7 +74,7 @@ it("handles simultaneous retries atomically and rolls back a trip when its recei
   const before = sqlite.prepare("SELECT COUNT(*) AS n FROM trips").get();
   sqlite.exec("CREATE TEMP TRIGGER reject_mobile_receipt BEFORE INSERT ON mobile_trip_submissions BEGIN SELECT RAISE(ABORT, 'test failure'); END");
   try {
-    const response = await call("POST", "trips", trip());
+    const response = await call("POST", "trips", { ...trip(), startTime: "09:00", endTime: "09:30", odometerStart: 12365 });
     expect(response.status).toBe(500);
     expect(await response.text()).not.toContain("test failure");
     expect(sqlite.prepare("SELECT COUNT(*) AS n FROM trips").get()).toEqual(before);
@@ -98,7 +98,7 @@ it("validates dates, times, numbers, unknown fields, JSON format and payload siz
 });
 
 it("rejects archived routes while still acknowledging already accepted submissions", async () => {
-  const input = trip();
+  const input = { ...trip(), date: "2026-09-30", odometerStart: 12365 };
   expect((await call("POST", "trips", input)).status).toBe(201);
   await archiveRoutePair(routeId);
   expect((await call("POST", "trips", input)).status).toBe(200);
@@ -144,10 +144,10 @@ it("rate limits password attempts", async () => {
 it("edits and deletes shared trips with revision checks while retaining the original submission receipt", async () => {
   token = createMobileSession(userId).accessToken;
   const pair = await createRoutePair({ placeA: "Ändern A", placeB: "Ändern B", distanceKm: 20, reimbursedKm: 15, durationMinutes: 30 });
-  const input = { ...trip(), date: "2026-08-10", routePairId: pair.id };
+  const input = { ...trip(), date: "2026-08-10", odometerStart: 12000, routePairId: pair.id };
   const receipt = await (await call("POST", "trips", input)).json();
   const id = receipt.trip.id;
-  const changes = { date: "2026-08-11", startTime: "09:00", endTime: "10:00", odometerStart: 15000,
+  const changes = { date: "2026-08-11", startTime: "09:00", endTime: "10:00", odometerStart: 12100,
     remark: "Korrigiert", accompanyingStaff: "Müller", expectedUpdatedAt: receipt.trip.updatedAt };
   for (const method of ["PUT", "DELETE"]) {
     expect((await call(method, `trips/${id}`, method === "PUT" ? changes : { expectedUpdatedAt: receipt.trip.updatedAt }, null)).status).toBe(401);
@@ -157,7 +157,7 @@ it("edits and deletes shared trips with revision checks while retaining the orig
   const response = await call("PUT", `trips/${id}`, changes);
   expect(response.status).toBe(200);
   const updated = (await response.json()).trip;
-  expect(updated).toMatchObject({ id, date: changes.date, odometerStart: 15000, odometerEnd: 15020, remark: "Korrigiert", accompanyingStaff: "Müller", distanceKm: 20 });
+  expect(updated).toMatchObject({ id, date: changes.date, odometerStart: 12100, odometerEnd: 12120, remark: "Korrigiert", accompanyingStaff: "Müller", distanceKm: 20 });
   expect(updated.updatedAt).not.toBe(receipt.trip.updatedAt);
   expect((await call("PUT", `trips/${id}`, changes)).status).toBe(409);
   expect((await call("DELETE", `trips/${id}`, { expectedUpdatedAt: receipt.trip.updatedAt })).status).toBe(409);
@@ -178,7 +178,7 @@ it("edits and deletes shared trips with revision checks while retaining the orig
 it("rejects simultaneous stale edits and preserves historic CSV route snapshots", async () => {
   token = createMobileSession(userId).accessToken;
   const pair = await createRoutePair({ placeA: "Parallel A", placeB: "Parallel B", distanceKm: 10, reimbursedKm: 10, durationMinutes: 20 });
-  const input = { ...trip(), date: "2026-07-10", routePairId: pair.id };
+  const input = { ...trip(), date: "2026-07-10", odometerStart: 100, routePairId: pair.id };
   const receipt = await (await call("POST", "trips", input)).json();
   const id = receipt.trip.id;
   sqlite.prepare("UPDATE trips SET route_pair_id=NULL, direction=NULL, origin_snapshot='CSV-Strecke' WHERE id=?").run(id);

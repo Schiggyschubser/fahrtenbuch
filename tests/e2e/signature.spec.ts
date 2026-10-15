@@ -34,7 +34,7 @@ test("Unterschrift zeichnen, hochladen, speichern und optional im Antrag drucken
   expect((await (await page.request.get("/api/settings/claim-template")).json()).signature).toBe(saved.signature);
 
   const { route } = await (await page.request.post("/api/routes", { data: { placeA: "Signatur Start", placeB: "Signatur Ziel", distanceKm: 8, reimbursedKm: 8, durationMinutes: 15 } })).json();
-  expect((await page.request.post("/api/trips", { data: { date: "2025-10-15", startTime: "08:00", endTime: "08:15", routePairId: route.id, direction: "A_TO_B", odometerStart: 2000 } })).ok()).toBe(true);
+  expect((await page.request.post("/api/trips", { data: { date: "2025-10-15", startTime: "08:00", endTime: "08:15", routePairId: route.id, direction: "A_TO_B", odometerStart: 950 } })).ok()).toBe(true);
   await page.goto("/print?month=2025-10");
   await expect(page.locator(".print-pages")).toHaveAttribute("data-ready", "true");
   await expect(page.getByTestId("claim-signature")).toHaveCount(0);
