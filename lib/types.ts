@@ -71,6 +71,15 @@ export type MonthDataDto = {
   suggestedOdometerStart: number | null;
 };
 
+export type TripOdometerPreviewDto = {
+  revision: string;
+  deltaKm: number;
+  sequenceNumber: number;
+  oldOdometerEnd: number;
+  newOdometerEnd: number;
+  followingTrips: Array<Pick<TripDto, "id" | "sequenceNumber" | "date" | "startTime" | "routeLabel" | "odometerStart" | "odometerEnd">>;
+};
+
 export type TripDateRangeDto = {
   firstDate: string | null;
   lastDate: string | null;

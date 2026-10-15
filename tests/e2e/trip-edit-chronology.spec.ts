@@ -28,10 +28,12 @@ for (const viewport of [{ width: 1280, height: 720 }, { width: 390, height: 844 
     const save = dialog.getByRole("button", { name: "Speichern", exact: true });
     await dialog.getByLabel("KM Beginn", { exact: true }).fill(String(odometerStart + 11));
     await save.click();
+    await dialog.getByRole("button", { name: "Änderung bestätigen", exact: true }).click();
     const alert = dialog.getByRole("alert");
     await expect(alert).toContainText("KM Ende");
     await expect(alert).toBeInViewport();
     expect(await read()).toEqual(original);
+    await dialog.getByRole("button", { name: "Zurück zur Bearbeitung", exact: true }).click();
     await dialog.getByLabel("KM Beginn", { exact: true }).fill(String(odometerStart));
     await dialog.getByLabel("Ende", { exact: true }).fill("10:01");
     await save.click();
@@ -41,12 +43,15 @@ for (const viewport of [{ width: 1280, height: 720 }, { width: 390, height: 844 
     await dialog.getByRole("combobox", { name: "Reiseweg" }).fill(`Chronologie ${year}`);
     await page.getByRole("option", { name: new RegExp(`Chronologie ${year}.*Lang`) }).click();
     await save.click();
+    await dialog.getByRole("button", { name: "Änderung bestätigen", exact: true }).click();
     await expect(alert).toContainText("KM Ende");
     expect(await read()).toEqual(original);
+    await dialog.getByRole("button", { name: "Zurück zur Bearbeitung", exact: true }).click();
     await dialog.getByRole("combobox", { name: "Reiseweg" }).fill(`Chronologie ${year}`);
     await page.getByRole("option", { name: new RegExp(`Chronologie ${year}.*Ziel`) }).click();
     await dialog.getByLabel("KM Beginn", { exact: true }).fill(String(odometerStart + 5));
     await save.click();
+    await dialog.getByRole("button", { name: "Änderung bestätigen", exact: true }).click();
     await expect(dialog).toBeHidden();
     const updated = await read();
     expect(updated[0]).toMatchObject({ id: original[0].id, odometerStart: odometerStart + 5, odometerEnd: odometerStart + 15 });

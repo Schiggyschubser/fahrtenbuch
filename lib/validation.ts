@@ -108,6 +108,16 @@ export const updateTripSchema = tripBaseSchema.and(z.object({
   message: "Reiseweg und Richtung müssen gemeinsam geändert werden.",
 }));
 
+export const odometerAdjustmentSchema = z.object({
+  throughTripId: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).nullable(),
+  revision: z.string().regex(/^[a-f0-9]{64}$/, "Die Kilometervorschau ist ungültig. Bitte erneut bearbeiten."),
+});
+
+export const updateTripRequestSchema = updateTripSchema.and(z.object({
+  expectedUpdatedAt: z.string().min(1).max(80).optional(),
+  odometerAdjustment: odometerAdjustmentSchema.optional(),
+}));
+
 export function firstZodMessage(error: z.ZodError) {
   return error.issues[0]?.message ?? "Die Eingaben sind ungültig.";
 }

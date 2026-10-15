@@ -4,7 +4,7 @@ import { faChevronDown, faClock, faMagnifyingGlass } from "@fortawesome/free-sol
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
-import type { RemarkSettingsDto, RouteOptionDto, TripDto } from "@/lib/types";
+import type { RemarkSettingsDto, RouteOptionDto, TripDto, TripOdometerPreviewDto } from "@/lib/types";
 import { normalizeTimeInput } from "@/lib/time-input";
 import { searchRouteOptions } from "@/lib/route-options";
 import { Modal } from "./Modal";
@@ -303,6 +303,10 @@ export function TripModal({ trip, defaultDate, suggestedOdometerStart, routeOpti
     return () => controller.abort();
   }, [trip]);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [pendingEdit, setPendingEdit] = useState<{ payload: Record<string, unknown>; preview: TripOdometerPreviewDto } | null>(null);
+  const [shiftThroughTripId, setShiftThroughTripId] = useState("");
+  const adjustmentSelectRef = useRef<HTMLSelectElement>(null);
+  const focusedAdjustmentRef = useRef<typeof pendingEdit>(null);
   const deleteButtonRef = useRef<HTMLButtonElement>(null);
   const confirmDeleteButtonRef = useRef<HTMLButtonElement>(null);
   const [isPending, startTransition] = useTransition();
@@ -310,6 +314,14 @@ export function TripModal({ trip, defaultDate, suggestedOdometerStart, routeOpti
   useEffect(() => {
     if (confirmDelete) confirmDeleteButtonRef.current?.focus({ preventScroll: true });
   }, [confirmDelete]);
+
+  useEffect(() => {
+    if (!pendingEdit) focusedAdjustmentRef.current = null;
+    else if (!isPending && focusedAdjustmentRef.current !== pendingEdit) {
+      adjustmentSelectRef.current?.focus();
+      focusedAdjustmentRef.current = pendingEdit;
+    }
+  }, [pendingEdit, isPending]);
 
   function cancelDelete() {
     setConfirmDelete(false);
@@ -320,6 +332,39 @@ export function TripModal({ trip, defaultDate, suggestedOdometerStart, routeOpti
   const distanceKm = selectedRoute?.distanceKm ?? trip?.distanceKm ?? 0;
   const odometerNumber = Number(odometerStart);
   const odometerEnd = Number.isInteger(odometerNumber) && odometerStart !== "" ? odometerNumber + distanceKm : null;
+  const selectedEndIndex = pendingEdit?.preview.followingTrips.findIndex((row) => String(row.id) === shiftThroughTripId) ?? -1;
+  const shiftedCount = selectedEndIndex + 1;
+  const selectedEndTrip = pendingEdit?.preview.followingTrips[selectedEndIndex];
+  const firstUntouchedTrip = pendingEdit?.preview.followingTrips[selectedEndIndex + 1];
+
+  async function save(payload: Record<string, unknown>) {
+    const response = await fetch(trip ? `/api/trips/${trip.id}` : "/api/trips", {
+      method: trip ? "PATCH" : "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const result = await response.json().catch(() => null);
+    if (!response.ok || !result?.trip) throw new Error(result?.error ?? "Die Fahrt konnte nicht gespeichert werden.");
+    onSaved(String(payload.date));
+  }
+
+  function confirmEdit() {
+    if (!pendingEdit || isPending) return;
+    setError("");
+    startTransition(async () => {
+      try {
+        await save({
+          ...pendingEdit.payload,
+          odometerAdjustment: {
+            throughTripId: shiftThroughTripId ? Number(shiftThroughTripId) : null,
+            revision: pendingEdit.preview.revision,
+          },
+        });
+      } catch (error) {
+        setError(error instanceof Error && !(error instanceof TypeError) ? error.message : "Die Fahrt konnte nicht gespeichert werden. Bitte versuche es erneut.");
+      }
+    });
+  }
 
   async function suggestOdometer(nextDate: string, nextStartTime: string) {
     if (odometerTouchedRef.current) return;
@@ -348,7 +393,7 @@ export function TripModal({ trip, defaultDate, suggestedOdometerStart, routeOpti
 
   function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (confirmDelete) return;
+    if (confirmDelete || pendingEdit || isPending) return;
     setError("");
     if ((!trip || routeChanged) && !selectedRoute) {
       setError("Bitte wähle einen vorhandenen Reiseweg aus der Liste.");
@@ -370,21 +415,24 @@ export function TripModal({ trip, defaultDate, suggestedOdometerStart, routeOpti
       payload.routePairId = selectedRoute!.routePairId;
       payload.direction = selectedRoute!.direction;
     }
+    if (trip?.updatedAt) payload.expectedUpdatedAt = trip.updatedAt;
     startTransition(async () => {
       try {
-        const response = await fetch(trip ? `/api/trips/${trip.id}` : "/api/trips", {
-          method: trip ? "PATCH" : "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        const result = await response.json().catch(() => null);
-        if (!response.ok || !result?.trip) {
-          setError(result?.error ?? "Die Fahrt konnte nicht gespeichert werden.");
-          return;
+        if (trip) {
+          const response = await fetch(`/api/trips/${trip.id}/odometer-adjustment`, {
+            method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+          });
+          const result = await response.json().catch(() => null);
+          if (!response.ok || !result?.preview) throw new Error(result?.error ?? "Die Kilometervorschau konnte nicht geladen werden.");
+          if (result.preview.deltaKm !== 0) {
+            setShiftThroughTripId("");
+            setPendingEdit({ payload, preview: result.preview });
+            return;
+          }
         }
-        onSaved(date);
-      } catch {
-        setError("Die Fahrt konnte nicht gespeichert werden. Bitte versuche es erneut.");
+        await save(payload);
+      } catch (error) {
+        setError(error instanceof Error && !(error instanceof TypeError) ? error.message : "Die Fahrt konnte nicht gespeichert werden. Bitte versuche es erneut.");
       }
     });
   }
@@ -416,7 +464,28 @@ export function TripModal({ trip, defaultDate, suggestedOdometerStart, routeOpti
     <Modal title={trip ? "Fahrt bearbeiten" : "Neue Fahrt"} description={trip ? "Passe die Angaben an oder lösche den Eintrag." : "Erfasse deine Dienstfahrt in wenigen Schritten."} size="wide" onClose={onClose}>
       {(requestClose) => (
       <form onSubmit={submit}>
-        <div className="space-y-5 px-5 py-5 sm:px-7 sm:py-6">
+        {pendingEdit ? (
+          <div className="space-y-5 px-5 py-5 sm:px-7 sm:py-6">
+            <div>
+              <h3 className="font-extrabold">Kilometeränderung bestätigen</h3>
+              <p className="mt-2 text-sm">Bei Fahrt Nr. {pendingEdit.preview.sequenceNumber} ändert sich KM Ende von {pendingEdit.preview.oldOdometerEnd.toLocaleString("de-DE")} auf {pendingEdit.preview.newOdometerEnd.toLocaleString("de-DE")} km ({pendingEdit.preview.deltaKm > 0 ? "+" : ""}{pendingEdit.preview.deltaKm} km).</p>
+            </div>
+            <div>
+              <label className="label" htmlFor="trip-shift-through">Kilometer verschieben bis einschließlich</label>
+              <select ref={adjustmentSelectRef} id="trip-shift-through" className="field w-full min-w-0" value={shiftThroughTripId} disabled={isPending} onChange={(event) => { setShiftThroughTripId(event.target.value); setError(""); }}>
+                <option value="">Keine nachfolgenden Fahrten ändern</option>
+                {pendingEdit.preview.followingTrips.map((row) => <option key={row.id} value={row.id}>Fahrt Nr. {row.sequenceNumber} · {row.date.split("-").reverse().join(".")} {row.startTime} · {row.routeLabel}</option>)}
+              </select>
+            </div>
+            <div role="status" className="space-y-2 rounded-2xl border border-[var(--line)] bg-[var(--surface-muted)] p-4 text-sm">
+              <p className="font-bold">{shiftedCount ? `${shiftedCount} nachfolgende ${shiftedCount === 1 ? "Fahrt wird" : "Fahrten werden"} um ${pendingEdit.preview.deltaKm > 0 ? "+" : ""}${pendingEdit.preview.deltaKm} km verschoben.` : "Nur die bearbeitete Fahrt wird geändert."}</p>
+              {selectedEndTrip ? <p>Fahrt Nr. {selectedEndTrip.sequenceNumber}: {selectedEndTrip.odometerStart.toLocaleString("de-DE")}–{selectedEndTrip.odometerEnd.toLocaleString("de-DE")} km → {(selectedEndTrip.odometerStart + pendingEdit.preview.deltaKm).toLocaleString("de-DE")}–{(selectedEndTrip.odometerEnd + pendingEdit.preview.deltaKm).toLocaleString("de-DE")} km.</p> : null}
+              {shiftedCount ? <p>Privatkilometer zwischen der bearbeiteten Fahrt und den gewählten Folgefahrten bleiben erhalten. Die Streckenlängen der Folgefahrten bleiben gleich.</p> : null}
+              {firstUntouchedTrip ? <p>Ab Fahrt Nr. {firstUntouchedTrip.sequenceNumber} bleiben die Stände unverändert. Der Kilometerabstand zu dieser Fahrt kann sich ändern. Bei einem Konflikt wird nichts gespeichert.</p> : null}
+              {shiftedCount ? <p>Vor dem Speichern wird eine Sicherheitskopie erstellt.</p> : null}
+            </div>
+          </div>
+        ) : <div className="space-y-5 px-5 py-5 sm:px-7 sm:py-6">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div>
               <label className="label" htmlFor="trip-date">Datum</label>
@@ -470,7 +539,7 @@ export function TripModal({ trip, defaultDate, suggestedOdometerStart, routeOpti
               <p className="mt-2 text-xs text-[var(--muted)]">Vorlagentexte kannst du frei bearbeiten oder ergänzen.</p>
             </div>
           </div>
-        </div>
+        </div>}
 
         {confirmDelete && trip ? (
           <footer className="sticky bottom-0 z-10 space-y-3 border-t border-[var(--danger-line)] bg-[var(--surface-muted)] px-5 py-4 sm:px-7">
@@ -482,6 +551,14 @@ export function TripModal({ trip, defaultDate, suggestedOdometerStart, routeOpti
             <div className="flex justify-end gap-3">
               <button type="button" className="btn-secondary focus-ring" onClick={cancelDelete} disabled={isPending}>Abbrechen</button>
               <button ref={confirmDeleteButtonRef} type="button" className="btn-danger focus-ring" onClick={remove} disabled={isPending}>{isPending ? "Löschen …" : "Löschen"}</button>
+            </div>
+          </footer>
+        ) : pendingEdit ? (
+          <footer className="sticky bottom-0 z-10 space-y-3 border-t border-[var(--line)] bg-[var(--surface-muted)] px-5 py-4 sm:px-7">
+            {error ? <p role="alert" className="text-sm font-medium text-[var(--danger)]">{error}</p> : null}
+            <div className="flex flex-wrap justify-end gap-3">
+              <button type="button" className="btn-secondary focus-ring" disabled={isPending} onClick={() => { setPendingEdit(null); setError(""); }}>Zurück zur Bearbeitung</button>
+              <button type="button" className="btn-primary focus-ring" disabled={isPending} onClick={confirmEdit}>{isPending ? "Speichern …" : "Änderung bestätigen"}</button>
             </div>
           </footer>
         ) : (

@@ -1,3 +1,11 @@
+# Version 1.0.18 · 15.10.2026
+
+- Kilometeränderungen zeigen vor dem Speichern eine Vorschau und fragen, ob keine Folgefahrt oder alle Fahrten bis zu einer gewählten Endfahrt einschließlich verschoben werden sollen.
+- Privatkilometer werden aus den angrenzenden Ständen berechnet; die Lücke zur ersten unveränderten Fahrt darf wachsen oder schrumpfen. Negative Abstände verhindern die gesamte Speicherung.
+- Sicherheitskopie vor Bereichskorrekturen, gemeinsame Transaktion und Schutz vor zwischenzeitlichen Änderungen. Keine Datenbankmigration.
+- Image für Linux AMD64 und ARM64: `ghcr.io/schiggyschubser/fahrtenbuch:1.0.18`; Compose verwendet diesen festen Tag. Ports, Mounts und Umgebungsvariablen bleiben unverändert.
+- Bedienung, Tests und Rollback: [ODOMETER_ADJUSTMENT.md](ODOMETER_ADJUSTMENT.md).
+
 # Version 1.0.17 · 15.10.2026
 
 - Löschbestätigung direkt in der sichtbaren Fußleiste, mit Fahrtnummer und Hinweis auf das automatische Nachrücken aller späteren Nummern.

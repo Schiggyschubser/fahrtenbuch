@@ -1,15 +1,17 @@
 import { and, asc, desc, eq, gte, lt, lte, or } from "drizzle-orm";
+import { createHash } from "node:crypto";
+import type { z } from "zod";
 import { db, ensureDatabaseReady, sqlite } from "../db";
 import { appSettings, routePairs, trips, type Direction } from "../db/schema";
 import { createBackup } from "../backups";
 import { monthBounds } from "../dates";
 import { unreimbursedKm } from "../kilometers";
 import { potentialReimbursementCents } from "../money";
-import type { MonthDataDto, TripCsvImportResultDto, TripDateRangeDto, TripDto } from "../types";
+import type { MonthDataDto, TripCsvImportResultDto, TripDateRangeDto, TripDto, TripOdometerPreviewDto } from "../types";
 import { tripCsvDuplicateKey, type TripCsvRow } from "../trip-csv";
 import { getRemarkSettings } from "./remarks";
-import { assertTripChronology } from "../trip-chronology";
-import { createTripSchema, updateTripSchema } from "../validation";
+import { assertTripChronology, TripChronologyError } from "../trip-chronology";
+import { createTripSchema, odometerAdjustmentSchema, updateTripSchema } from "../validation";
 
 export function tripToDto(row: typeof trips.$inferSelect): TripDto {
   const pair = row.routePairId !== null && row.direction !== null
@@ -222,37 +224,103 @@ export function createTripSync(input: TripInput) {
   }).immediate();
 }
 
-export async function updateTrip(id: number, input: Omit<TripInput, "routePairId" | "direction"> & {
-  routePairId?: number;
-  direction?: Direction;
-}, expectedUpdatedAt?: string) {
+type TripUpdateInput = z.infer<typeof updateTripSchema>;
+type OdometerAdjustment = z.infer<typeof odometerAdjustmentSchema>;
+
+function prepareTripEdit(id: number, raw: TripUpdateInput) {
+  const input = updateTripSchema.parse(raw);
+  const rows = db.select().from(trips).orderBy(asc(trips.date), asc(trips.startTime), asc(trips.id)).all();
+  const index = rows.findIndex((row) => row.id === id);
+  if (index < 0) return null;
+  const existing = rows[index];
+  let routeValues: Partial<typeof trips.$inferInsert> = {};
+  let distanceKm = existing.distanceKmSnapshot;
+  if (input.routePairId && input.direction) {
+    const pair = db.select().from(routePairs).where(eq(routePairs.id, input.routePairId)).get();
+    if (!pair || pair.archivedAt) throw new Error("Der gewählte Reiseweg ist nicht mehr verfügbar.");
+    distanceKm = pair.distanceKm;
+    routeValues = {
+      originFullNameSnapshot: "",
+      destinationFullNameSnapshot: "",
+      routePairId: input.routePairId,
+      direction: input.direction,
+      ...routeSnapshot(pair, input.direction),
+    };
+  }
+  // Bind the confirmation to this proposal and the complete chronological snapshot.
+  // Insertion, deletion, reordering and concurrent edits invalidate the preview.
+  const revision = createHash("sha256").update(JSON.stringify({ rows, input, routeValues })).digest("hex");
+  const deltaKm = input.odometerStart + distanceKm - existing.odometerStart - existing.distanceKmSnapshot;
+  return { input, rows, index, existing, distanceKm, routeValues, revision, deltaKm };
+}
+
+export function previewTripOdometerAdjustment(id: number, input: TripUpdateInput, expectedUpdatedAt?: string): TripOdometerPreviewDto | null {
   ensureDatabaseReady();
   return sqlite.transaction(() => {
-    const existing = db.select().from(trips).where(eq(trips.id, id)).get();
-    if (!existing) return null;
-    if (expectedUpdatedAt !== undefined && existing.updatedAt !== expectedUpdatedAt) return null;
-    input = updateTripSchema.parse(input);
-    let routeValues = {};
-    let distanceKm = existing.distanceKmSnapshot;
-    if (input.routePairId && input.direction) {
-      const pair = db.select().from(routePairs).where(eq(routePairs.id, input.routePairId)).get();
-      if (!pair || pair.archivedAt) throw new Error("Der gewählte Reiseweg ist nicht mehr verfügbar.");
-      distanceKm = pair.distanceKm;
-      routeValues = {
-        originFullNameSnapshot: "",
-        destinationFullNameSnapshot: "",
-        routePairId: input.routePairId,
-        direction: input.direction,
-        ...routeSnapshot(pair, input.direction),
-      };
+    const edit = prepareTripEdit(id, input);
+    if (!edit) return null;
+    if (expectedUpdatedAt !== undefined && edit.existing.updatedAt !== expectedUpdatedAt) {
+      throw new TripChronologyError("Die Fahrt wurde inzwischen geändert. Bitte schließen und erneut öffnen.");
     }
+    return {
+      revision: edit.revision,
+      deltaKm: edit.deltaKm,
+      sequenceNumber: edit.index + 1,
+      oldOdometerEnd: edit.existing.odometerStart + edit.existing.distanceKmSnapshot,
+      newOdometerEnd: edit.input.odometerStart + edit.distanceKm,
+      followingTrips: edit.rows.slice(edit.index + 1).map((row, offset) => ({
+        id: row.id, sequenceNumber: edit.index + offset + 2,
+        date: row.date, startTime: row.startTime,
+        routeLabel: row.destinationSnapshot ? `${row.originSnapshot} → ${row.destinationSnapshot}` : row.originSnapshot,
+        odometerStart: row.odometerStart, odometerEnd: row.odometerStart + row.distanceKmSnapshot,
+      })),
+    };
+  })();
+}
+
+function selectedOdometerTrips(edit: NonNullable<ReturnType<typeof prepareTripEdit>>, adjustment: OdometerAdjustment) {
+  if (adjustment.revision !== edit.revision) {
+    throw new TripChronologyError("Die Fahrten oder der Reiseweg wurden inzwischen geändert. Bitte zurück zur Bearbeitung und die Vorschau erneut laden.");
+  }
+  if (adjustment.throughTripId === null) return [];
+  if (edit.deltaKm === 0) throw new Error("Ohne Kilometeränderung können keine Folgefahrten verschoben werden.");
+  const endIndex = edit.rows.findIndex((row) => row.id === adjustment.throughTripId);
+  if (endIndex <= edit.index) throw new Error("Bitte eine vorhandene nachfolgende Fahrt als Ende auswählen.");
+  const newOrder = [...edit.rows].map((row) => row.id === edit.existing.id ? { ...row, date: edit.input.date, startTime: edit.input.startTime } : row)
+    .sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime) || a.id - b.id);
+  if (newOrder.some((row, index) => row.id !== edit.rows[index].id)) {
+    throw new TripChronologyError("Bitte eine Änderung der Fahrtreihenfolge separat speichern, bevor du nachfolgende Kilometerstände verschiebst.");
+  }
+  return edit.rows.slice(edit.index + 1, endIndex + 1);
+}
+
+export async function updateTrip(id: number, input: TripUpdateInput, expectedUpdatedAt?: string, adjustment?: OdometerAdjustment) {
+  ensureDatabaseReady();
+  if (adjustment) {
+    adjustment = odometerAdjustmentSchema.parse(adjustment);
+    // Check before backup, then check again under the write lock after backup.
+    const edit = sqlite.transaction(() => prepareTripEdit(id, input))();
+    if (!edit || (expectedUpdatedAt !== undefined && edit.existing.updatedAt !== expectedUpdatedAt)) return null;
+    const selected = selectedOdometerTrips(edit, adjustment);
+    if (selected.length) await createBackup("safety");
+  }
+  return sqlite.transaction(() => {
+    const edit = prepareTripEdit(id, input);
+    if (!edit) return null;
+    const { existing, distanceKm, routeValues } = edit;
+    if (expectedUpdatedAt !== undefined && existing.updatedAt !== expectedUpdatedAt) return null;
+    input = edit.input;
+    const shifted = adjustment ? selectedOdometerTrips(edit, adjustment) : [];
+    const shiftedInputs = shifted.map((row) => ({
+      date: row.date, startTime: row.startTime, endTime: row.endTime,
+      odometerStart: row.odometerStart + edit.deltaKm,
+    }));
+    for (const proposed of shiftedInputs) updateTripSchema.parse(proposed);
     // Text-only edits remain possible for historical entries. Every change to
     // chronology or mileage is checked against the actual proposed distance.
-    if (input.date !== existing.date || input.startTime !== existing.startTime || input.endTime !== existing.endTime
+    const needsChronologyCheck = input.date !== existing.date || input.startTime !== existing.startTime || input.endTime !== existing.endTime
       || input.odometerStart !== existing.odometerStart || distanceKm !== existing.distanceKmSnapshot
-      || (input.routePairId !== undefined && (input.routePairId !== existing.routePairId || input.direction !== existing.direction))) {
-      assertTripChronology({ ...input, distanceKm }, id);
-    }
+      || (input.routePairId !== undefined && (input.routePairId !== existing.routePairId || input.direction !== existing.direction));
     const updated = db.update(trips).set({
       accompanyingStaff: input.accompanyingStaff?.trim() ?? existing.accompanyingStaff,
       remark: input.remark?.trim() ?? existing.remark,
@@ -264,7 +332,20 @@ export async function updateTrip(id: number, input: Omit<TripInput, "routePairId
       updatedAt: new Date(Math.max(Date.now(), Date.parse(existing.updatedAt) + 1)).toISOString(),
     }).where(expectedUpdatedAt === undefined ? eq(trips.id, id) :
       and(eq(trips.id, id), eq(trips.updatedAt, expectedUpdatedAt))).returning().get();
-    return updated ? tripToDto(updated) : null;
+    if (!updated) return null;
+    for (const row of shifted) {
+      db.update(trips).set({
+        odometerStart: row.odometerStart + edit.deltaKm,
+        updatedAt: new Date(Math.max(Date.now(), Date.parse(row.updatedAt) + 1)).toISOString(),
+      }).where(eq(trips.id, row.id)).run();
+    }
+    // Validate the final state, including both untouched boundaries. Any conflict
+    // rolls back the edited trip and every shifted trip in this transaction.
+    if (needsChronologyCheck) assertTripChronology({ ...input, distanceKm }, id);
+    for (const [index, row] of shifted.entries()) {
+      assertTripChronology({ ...shiftedInputs[index], distanceKm: row.distanceKmSnapshot }, row.id);
+    }
+    return tripToDto(updated);
   }).immediate();
 }
 

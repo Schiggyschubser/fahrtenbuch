@@ -1,5 +1,33 @@
 [
   {
+    "version": "1.0.18",
+    "date": "2026-10-15",
+    "title": "Kilometerkorrektur mit Vorschau und frei wählbarer Endfahrt einschließlich; variable Privatkilometer am Bereichsende",
+    "fileCount": 20,
+    "files": [
+      "ODOMETER_ADJUSTMENT.md",
+      "README.md",
+      "RELEASE_NOTES.md",
+      "VERSION",
+      "app/api/trips/[id]/odometer-adjustment/route.ts",
+      "app/api/trips/[id]/route.ts",
+      "components/TripModal.tsx",
+      "docker-compose.yaml",
+      "eslint.config.mjs",
+      "lib/changelog.json",
+      "lib/repositories/trips.ts",
+      "lib/types.ts",
+      "lib/validation.ts",
+      "package-lock.json",
+      "package.json",
+      "tests/container-smoke.mjs",
+      "tests/e2e/trip-edit-chronology.spec.ts",
+      "tests/e2e/trip-odometer.spec.ts",
+      "tests/trip-odometer.integration.test.ts",
+      "vitest.config.ts"
+    ]
+  },
+  {
     "version": "1.0.17",
     "date": "2026-10-15",
     "title": "Sichtbare Löschbestätigung; Chronologieschutz beim Anlegen, Bearbeiten und CSV-Import",

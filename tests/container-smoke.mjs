@@ -136,6 +136,48 @@ try {
     ]);
     assert.equal(body.routes.length, 4);
   }
+  // Exercise the bounded correction against the actual production image,
+  // exclusively with this container's disposable /tmp database.
+  const correctedRouteResponse = await post("/api/routes", { placeA: "KM Start", placeB: "KM Ziel", distanceKm: 30, reimbursedKm: 25, durationMinutes: 30 }, { Cookie });
+  assert.equal(correctedRouteResponse.status, 201);
+  const correctedRoute = (await correctedRouteResponse.json()).route;
+  const odometerTrips = [];
+  for (const [date, odometerStart] of [["2027-08-31", 2000], ["2027-09-01", 2035], ["2027-09-02", 2060], ["2027-09-03", 2100]]) {
+    const response = await post("/api/trips", { ...input, date, odometerStart }, { Cookie });
+    assert.equal(response.status, 201);
+    odometerTrips.push((await response.json()).trip);
+  }
+  const edited = odometerTrips[0];
+  const correction = { date: edited.date, startTime: edited.startTime, endTime: edited.endTime,
+    odometerStart: edited.odometerStart, routePairId: correctedRoute.id, direction: "A_TO_B", expectedUpdatedAt: edited.updatedAt };
+  const previewResponse = await post(`/api/trips/${edited.id}/odometer-adjustment`, correction, { Cookie });
+  assert.equal(previewResponse.status, 200);
+  const preview = (await previewResponse.json()).preview;
+  assert.equal(preview.deltaKm, 10);
+  assert.deepEqual(preview.followingTrips.map(t => t.id), odometerTrips.slice(1).map(t => t.id));
+  const patchTrip = body => fetch(`${base}/api/trips/${edited.id}`, {
+    method: "PATCH", headers: { Cookie, "Content-Type": "application/json" }, body: JSON.stringify(body),
+  });
+  const adjusted = await patchTrip({ ...correction, odometerAdjustment: { throughTripId: odometerTrips[2].id, revision: preview.revision } });
+  assert.equal(adjusted.status, 200);
+  const adjustedTrip = (await adjusted.json()).trip;
+  assert.equal(adjustedTrip.odometerEnd, 2030);
+  const readOdometerTrips = async () => (await (await fetch(`${base}/api/trips?month=2027-09`, { headers: { Cookie } })).json()).trips;
+  const shifted = await readOdometerTrips();
+  assert.deepEqual(shifted.map(t => [t.odometerStart, t.odometerEnd]), [[2045, 2065], [2070, 2090], [2100, 2120]]);
+  assert.deepEqual(shifted[2], odometerTrips[3]);
+  const boundaryConflict = { ...correction, expectedUpdatedAt: adjustedTrip.updatedAt, odometerStart: 2040 };
+  const conflictPreview = (await (await post(`/api/trips/${edited.id}/odometer-adjustment`, boundaryConflict, { Cookie })).json()).preview;
+  const rejected = await patchTrip({ ...boundaryConflict, odometerAdjustment: { throughTripId: shifted[1].id, revision: conflictPreview.revision } });
+  assert.equal(rejected.status, 409);
+  assert.deepEqual(await readOdometerTrips(), shifted);
+  const onlyThisTrip = { ...correction, expectedUpdatedAt: adjustedTrip.updatedAt, routePairId: route.id };
+  const onlyPreview = (await (await post(`/api/trips/${edited.id}/odometer-adjustment`, onlyThisTrip, { Cookie })).json()).preview;
+  assert.equal(onlyPreview.deltaKm, -10);
+  assert.equal((await patchTrip({ ...onlyThisTrip, odometerAdjustment: { throughTripId: null, revision: onlyPreview.revision } })).status, 200);
+  assert.deepEqual(await readOdometerTrips(), shifted);
+  assert.equal((await patchTrip({ ...onlyThisTrip, odometerAdjustment: { throughTripId: shifted[1].id, revision: onlyPreview.revision } })).status, 409);
+  console.log("Bounded odometer correction passed: inclusive endpoint across months, unchanged following trip, variable private mileage, conflict rollback, preview and stale revision protection.");
   assert.equal((await post("/api/v1/auth/logout", {}, { Authorization })).status, 200);
   assert.equal((await fetch(`${base}/api/v1/me`, { headers: { Authorization } })).status, 401);
   console.log("Container smoke passed: chronology conflicts on create/edit, cross-month renumbering after deletion, separate claim/trip print outputs, web/mobile login, restart/retry persistence, edit/delete with revision checks, immutable receipt, logout, claim template and signature validation/persistence/removal, route search through web/mobile APIs.");

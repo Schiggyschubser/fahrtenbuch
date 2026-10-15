@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { errorResponse, unauthorizedResponse } from "@/lib/api";
 import { requireApiUser } from "@/lib/auth";
 import { deleteTrip, updateTrip } from "@/lib/repositories/trips";
-import { updateTripSchema } from "@/lib/validation";
+import { updateTripRequestSchema } from "@/lib/validation";
 
 type Context = { params: Promise<{ id: string }> };
 
@@ -17,8 +17,9 @@ export async function PATCH(request: Request, context: Context) {
     const user = await requireApiUser();
     if (!user) return unauthorizedResponse();
     const id = parseId((await context.params).id);
-    const input = updateTripSchema.parse(await request.json());
-    const trip = await updateTrip(id, input);
+    const { expectedUpdatedAt, odometerAdjustment, ...input } = updateTripRequestSchema.parse(await request.json());
+    const trip = await updateTrip(id, input, expectedUpdatedAt, odometerAdjustment);
+    if (!trip && expectedUpdatedAt !== undefined) return NextResponse.json({ error: "Die Fahrt wurde inzwischen geändert oder gelöscht. Bitte schließen und erneut öffnen." }, { status: 409 });
     if (!trip) return NextResponse.json({ error: "Fahrt nicht gefunden." }, { status: 404 });
     return NextResponse.json({ trip });
   } catch (error) {
